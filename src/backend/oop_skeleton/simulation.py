@@ -19,6 +19,7 @@ from typing import Optional, List
 from enum import Enum
 from holding import Holding
 from asset import Asset
+from history_month import HistoryMonth
 
 
 # Cleaner way to define witch operation will be made
