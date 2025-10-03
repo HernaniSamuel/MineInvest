@@ -21,11 +21,7 @@ from typing import List, Optional, cast
 
 from src.backend.models.simulation import SimulationORM
 from src.backend.schemas.simulation import SimulationCreate
-
-
-class SimulationAlreadyExistsError(Exception):
-    """Raised when trying to create a simulation with a duplicate name"""
-    pass
+from src.backend.services.exceptions import SimulationAlreadyExistsError
 
 
 def create_simulation_service(db: Session, simulation: SimulationCreate) -> SimulationORM:
