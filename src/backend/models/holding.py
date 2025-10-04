@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from src.backend.models.base import Base
 
@@ -26,11 +26,11 @@ class HoldingORM(Base):
     name = Column(String, nullable=False)
     base_currency = Column(String, nullable=False)
 
-    quantity = Column(Numeric(32, 16), nullable=False)
-    purchase_price = Column(Numeric(32, 2), nullable=False)
-    weight = Column(Numeric(32, 16), nullable=False)
-    current_price = Column(Numeric(32, 2), nullable=False)
-    market_value = Column(Numeric(32, 2), nullable=False)
+    quantity = Column(String, nullable=False)
+    purchase_price = Column(String, nullable=False)
+    weight = Column(String, nullable=False)
+    current_price = Column(String, nullable=False)
+    market_value = Column(String, nullable=False)
 
     simulation_id = Column(Integer, ForeignKey('simulations.id'), nullable=False)
     simulation = relationship("SimulationORM", back_populates="holdings")

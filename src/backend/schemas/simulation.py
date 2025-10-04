@@ -15,7 +15,8 @@
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+
 
 
 class SimulationCreate(BaseModel):
@@ -74,6 +75,18 @@ class SimulationRead(BaseModel):
     balance: Decimal
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator('balance', mode='before')
+    @classmethod
+    def convert_balance(cls, v) -> Decimal:
+        """Ensure balance is always a Decimal, even if loaded as string from DB."""
+        if isinstance(v, str):
+            try:
+                return Decimal(v)
+            except InvalidOperation:
+                raise ValueError(f"Invalid balance format: {v}")
+        return v
+
 
 class SimulationSumary(BaseModel):
     """Lightweight schema for listing simulations"""

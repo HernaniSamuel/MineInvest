@@ -18,12 +18,19 @@ from fastapi import Depends, APIRouter, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from src.backend.models.session import get_db
+from src.backend.schemas.balance import BalanceOperationRequest
 from src.backend.schemas.simulation import SimulationCreate, SimulationRead, SimulationSumary
+from src.backend.services.balance_service import handle_balance_service
+from src.backend.services.exceptions import (
+    SimulationNotFoundError,
+    SimulationAlreadyExistsError,
+    InsufficientFundsError,
+    InvalidAmountError
+)
 from src.backend.services.simulation_service import (
     create_simulation_service,
     list_simulations_service,
     get_simulation_by_id_service,
-    SimulationAlreadyExistsError
 )
 
 router = APIRouter(prefix="/simulations", tags=["Simulations"])
@@ -55,6 +62,26 @@ def create_simulation(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"internal server error: {str(e)}")
+
+
+@router.post("/{simulation_id}/balance", response_model=SimulationRead)
+def modify_balance(
+        simulation_id: int,
+        request: BalanceOperationRequest,
+        db: Session = Depends(get_db)
+):
+    """
+    Modify simulation balance (add or remove money).
+    Single unified endpoint for all balance operations.
+    """
+    try:
+        return handle_balance_service(db, simulation_id, request)
+    except SimulationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except InsufficientFundsError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/", response_model=List[SimulationRead])

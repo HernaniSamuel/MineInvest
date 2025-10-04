@@ -40,7 +40,8 @@ class BalanceOperationRequest(BaseModel):
                     "ticker": "PETR4"
                 }
             ]
-        }
+        },
+        use_enum_values=False
     )
 
     amount: Decimal = Field(

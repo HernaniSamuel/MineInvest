@@ -27,7 +27,12 @@ class Operation(Enum):
         ADD: Adds to balance (contribution, dividend, sale proceeds)
         REMOVE: Subtracts from balance (withdrawal, purchase cost)
     """
-    ADD = 1
-    REMOVE = -1
+    ADD = "ADD"
+    REMOVE = "REMOVE"
+
+    @property
+    def value_muliplier(self) -> int:
+        """Get numeric multiplier for calculations."""
+        return 1 if self == Operation.ADD else -1
 
 

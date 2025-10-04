@@ -63,7 +63,7 @@ def test_contribution_without_ticker(db_session, sample_simulation):
     )
 
     result = handle_balance_service(db_session, sample_simulation.id, request)
-    assert result.balance == Decimal("1000.50")
+    assert Decimal(result.balance) == Decimal("1000.50")
 
 
 def test_dividend_with_high_precision(db_session, sample_simulation):
@@ -76,7 +76,9 @@ def test_dividend_with_high_precision(db_session, sample_simulation):
     )
 
     result = handle_balance_service(db_session, sample_simulation.id, request)
-    assert result.balance == Decimal("0.012345678")
+
+    # Convert string to Decimal for comparison
+    assert Decimal(result.balance) == Decimal("0.012345678")
 
     # Verify history logged correctly
     history = db_session.query(HistoryMonthORM).filter(
@@ -85,7 +87,6 @@ def test_dividend_with_high_precision(db_session, sample_simulation):
 
     assert history.operations[0]["ticker"] == "PETR4"
     assert Decimal(history.operations[0]["amount"]) == Decimal("0.012345678")
-
 
 def test_dividend_requires_ticker(db_session, sample_simulation):
     """Test dividend without ticker fails validation."""
@@ -156,7 +157,7 @@ def test_history_month_creation(db_session, sample_simulation):
 
     assert history is not None
     assert len(history.operations) == 1
-    assert history.total == Decimal("500.00")
+    assert Decimal(history.total) == Decimal("500.00")
 
 
 def test_multiple_operations_same_month(db_session, sample_simulation):
@@ -189,7 +190,7 @@ def test_multiple_operations_same_month(db_session, sample_simulation):
     ).first()
 
     assert len(history.operations) == 3
-    assert history.total == Decimal("800.05") # 1000 + 0.05 - 200
+    assert Decimal(history.total) == Decimal("800.05") # 1000 + 0.05 - 200
 
 
 def test_invalid_category(db_session, sample_simulation):

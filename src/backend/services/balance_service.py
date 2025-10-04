@@ -84,6 +84,9 @@ def handle_balance_service(
             f"Simulation with ID {simulation_id} not found"
         )
 
+    # Convert stored string to Decimal for calculation
+    current_balance = Decimal(simulation.balance)
+
     # Get validated amount
     amount = request.amount
 
@@ -97,20 +100,20 @@ def handle_balance_service(
         )
 
     # Calculate new balance using operation multiplier
-    balance_change = amount * request.operation.value
-    new_balance = simulation.balance + balance_change
+    balance_change = amount * request.operation.value_muliplier
+    new_balance = current_balance + balance_change
 
     # Validate sufficient funds for withdrawals/purchases
     if new_balance < Decimal('0'):
         raise InsufficientFundsError(
             f"Insufficient funds. "
-            f"Available: {simulation.balance}, "
+            f"Available: {current_balance}, "
             f"Requested: {request.category} of {amount}, "
             f"Shortfall: {abs(new_balance)}"
         )
 
     # Update balance
-    simulation.balance = new_balance
+    simulation.balance = str(new_balance)
 
     # Log operation in HistoryMonth
 
@@ -160,7 +163,7 @@ def _log_balance_operation(
             simulation_id=simulation.id,
             month_date=simulation.current_date,
             operations=[],
-            total=Decimal('0')
+            total='0'
         )
         db.add(current_history)
         db.flush()

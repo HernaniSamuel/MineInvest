@@ -60,7 +60,7 @@ def create_simulation_service(db: Session, simulation: SimulationCreate) -> Simu
         name=simulation.name.strip(),
         start_date=simulation.start_date,
         base_currency=simulation.base_currency.upper(),
-        balance=Decimal("0.0000000000000000"), # 16 zeros after point
+        balance=str("0.0000000000000000"), # 16 zeros after point
         current_date=simulation.start_date
     )
 

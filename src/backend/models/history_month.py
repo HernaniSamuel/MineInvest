@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from sqlalchemy import Column, Integer, Date, ForeignKey, Numeric, JSON
+from sqlalchemy import Column, Integer, Date, ForeignKey, String, JSON
 from sqlalchemy.orm import relationship
 
 from decimal import Decimal
@@ -26,7 +26,7 @@ class HistoryMonthORM(Base):
     id = Column(Integer, primary_key=True, index=True)
     month_date = Column(Date, nullable=False)
     operations = Column(JSON, default=lambda: [], nullable=False)
-    total = Column(Numeric(32, 16), default=Decimal('0.0000000000000000'), nullable=False)
+    total = Column(String, default=Decimal('0.0000000000000000'), nullable=False)
 
     simulation_id = Column(Integer, ForeignKey('simulations.id'), nullable=False)
     simulation = relationship('SimulationORM', back_populates='history')
