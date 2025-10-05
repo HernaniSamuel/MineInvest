@@ -21,6 +21,8 @@ from src.backend.models.simulation import SimulationORM
 from src.backend.models.holding import HoldingORM
 from src.backend.models.history_month import HistoryMonthORM
 from src.backend.models.asset import AssetORM
+from src.backend.models.ipca_cache import IPCACacheORM
+
 
 engine = create_engine('sqlite:///simulation.db')
 SessionLocal = sessionmaker(bind=engine)

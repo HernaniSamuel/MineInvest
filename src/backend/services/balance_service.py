@@ -85,7 +85,7 @@ def handle_balance_service(
         )
 
     # Convert stored string to Decimal for calculation
-    current_balance = Decimal(simulation.balance)
+    current_balance = Decimal(str(simulation.balance))
 
     # Get validated amount
     amount = request.amount
@@ -95,12 +95,13 @@ def handle_balance_service(
         amount = _apply_inflation_adjustment(
             amount=amount,
             base_currency=str(simulation.base_currency),
-            reference_date=simulation.current_date.date(),
-            current_date=date.today()
+            reference_date=simulation.current_date,
+            current_date=date.today(),
+            db_session=db
         )
 
     # Calculate new balance using operation multiplier
-    balance_change = amount * request.operation.value_muliplier
+    balance_change = amount * request.operation.value_multiplier
     new_balance = current_balance + balance_change
 
     # Validate sufficient funds for withdrawals/purchases

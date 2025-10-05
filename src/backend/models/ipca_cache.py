@@ -13,26 +13,15 @@
 # limitations under the License.
 
 
-from enum import Enum
+from sqlalchemy import Column, Integer, String, Date, UniqueConstraint
+from src.backend.models.base import Base
 
 
-class Operation(Enum):
-    """
-    Enumeration for add/subtract operations.
+class IPCACacheORM(Base):
+    """Cache for IPCA monthly inflation data."""
 
-    Using integer multipliers allows clean arithmetic:
-    balance += amount * operation.value
+    __tablename__ = 'ipca_cache'
 
-    Attributes:
-        ADD: Adds to balance (contribution, dividend, sale proceeds)
-        REMOVE: Subtracts from balance (withdrawal, purchase cost)
-    """
-    ADD = "ADD"
-    REMOVE = "REMOVE"
-
-    @property
-    def value_multiplier(self) -> int:
-        """Get numeric multiplier for calculations."""
-        return 1 if self == Operation.ADD else -1
-
-
+    id = Column(Integer, primary_key=True, index=True)
+    month_date = Column(Date, nullable=False, unique=True, index=True)
+    ipca_value = Column(String, nullable=False)

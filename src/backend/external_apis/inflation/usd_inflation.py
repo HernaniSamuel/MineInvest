@@ -13,26 +13,16 @@
 # limitations under the License.
 
 
-from enum import Enum
+from decimal import Decimal
+from datetime import date
+from src.backend.external_apis.inflation.base import InflationAPIInterface
 
 
-class Operation(Enum):
+class USDInflationAPI(InflationAPIInterface):
     """
-    Enumeration for add/subtract operations.
+    Fetches CPI (Consumer Price Index) for USD.
 
-    Using integer multipliers allows clean arithmetic:
-    balance += amount * operation.value
-
-    Attributes:
-        ADD: Adds to balance (contribution, dividend, sale proceeds)
-        REMOVE: Subtracts from balance (withdrawal, purchase cost)
+    TODO: Implement using FRED API or similar
+    https://fred.stlouisfed.org/series/CPIAUCSL
     """
-    ADD = "ADD"
-    REMOVE = "REMOVE"
-
-    @property
-    def value_multiplier(self) -> int:
-        """Get numeric multiplier for calculations."""
-        return 1 if self == Operation.ADD else -1
-
-
+    pass
