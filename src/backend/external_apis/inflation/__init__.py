@@ -43,7 +43,7 @@ class InflationAPIFactory:
         if currency == "BRL":
             return BCBInflationAPI(db_session)
         elif currency == "USD":
-            return USDInflationAPI()
+            return USDInflationAPI(db_session)
         else:
             raise ValueError(
                 f"No inflation API available for {currency}. "
