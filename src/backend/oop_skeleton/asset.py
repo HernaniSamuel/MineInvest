@@ -33,7 +33,6 @@ class Asset:
                              where each key is a month (date) and the value contains
                              OHLC, dividends, and splits.
         start_date (date): The first date for which historical data is available.
-        end_date (date): The last date for which historical data is available.
         base_currency (str): The currency in which the asset is denominated.
 
     Example:
@@ -54,7 +53,6 @@ class Asset:
             price=Decimal("11.75"),
             monthly_data=monthly_data,
             start_date=date(2025, 1, 1),
-            end_date=date(2025, 1, 31),
             base_currency="BRL"
         )
     """
@@ -64,5 +62,4 @@ class Asset:
         self.price: Decimal = price
         self.monthly_data: dict = monthly_data
         self.start_date: date = start_date
-        self.end_date: date = end_date
         self.base_currency: str = base_currency

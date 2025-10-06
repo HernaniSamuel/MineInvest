@@ -18,16 +18,17 @@ from src.backend.models.base import Base
 
 
 class AssetORM(Base):
+    """Persistent storage for purchased assets."""
+
     __tablename__ = 'assets'
 
     id = Column(Integer, primary_key=True, index=True)
-    ticker = Column(String, nullable=False, index=True)
+    ticker = Column(String, nullable=False, unique=True, index=True)
     name = Column(String, nullable=False)
     base_currency = Column(String, nullable=False)
     start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
-    simulation_ids = Column(JSON, default=[])
-    monthly_data = Column(JSON, default=[])
+    simulation_ids = Column(JSON, default=list, nullable=False)
+    monthly_data = Column(JSON, default=list, nullable=False)
     # MONTLY DATA FORMAT
     # [
     #   {

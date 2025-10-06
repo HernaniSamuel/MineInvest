@@ -14,7 +14,7 @@
 
 
 from fastapi import FastAPI
-from src.backend.routes import simulation
+from src.backend.routes import simulation, trading
 
 app = FastAPI(
     title="MineInvest API",
@@ -28,3 +28,4 @@ def read_root():
 
 # Register routers
 app.include_router(simulation.router)
+app.include_router(trading.router)

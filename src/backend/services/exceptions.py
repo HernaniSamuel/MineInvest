@@ -15,6 +15,22 @@ class InvalidAmountError(Exception):
     """Raised when amount has invalid format or value."""
     pass
 
+
 class SimulationNotFoundError(Exception):
     """Raised when simulation ID does not exist."""
+    pass
+
+
+class InsufficientPositionError(Exception):
+    """Raised when trying to sell more than owned."""
+    pass
+
+
+class PriceUnavailableError(Exception):
+    """Raised when price data not available for date."""
+    pass
+
+
+class AssetNotFoundError(Exception):
+    """Raised when asset ticker invalid."""
     pass
