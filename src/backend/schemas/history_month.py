@@ -13,23 +13,36 @@
 # limitations under the License.
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date
 from decimal import Decimal
 from typing import List, Dict, Optional
-from pydantic import ConfigDict
+
 
 class OperationDict(BaseModel):
     """Individual operation within a month"""
-    type: str # 'contribution', 'withdrawal', 'purchase', 'sale', 'dividend'
-    value: Decimal
+    type: str  # 'contribution', 'withdrawal', 'purchase', 'sale', 'dividend'
+    amount: Decimal  # Changed from 'value' to match what you're storing
     ticker: Optional[str] = None
 
+
 class HistoryMonthRead(BaseModel):
+    """Single month's history."""
     id: int
     month_date: date
-    operations: List[Dict]
+    operations: List[Dict]  # List of operation dicts
     total: Decimal
     simulation_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SimulationHistoryRead(BaseModel):
+    """Complete simulation history."""
+    simulation_id: int
+    simulation_name: str
+    start_date: date
+    current_date: date
+    months: List[HistoryMonthRead]
 
     model_config = ConfigDict(from_attributes=True)

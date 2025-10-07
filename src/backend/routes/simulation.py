@@ -20,7 +20,9 @@ from sqlalchemy.orm import Session
 from src.backend.models.session import get_db
 from src.backend.schemas.balance import BalanceOperationRequest
 from src.backend.schemas.simulation import SimulationCreate, SimulationRead, SimulationSumary
+from src.backend.schemas.history_month import SimulationHistoryRead
 from src.backend.services.balance_service import handle_balance_service
+from src.backend.services.history_service import get_simulation_history_service
 from src.backend.services.exceptions import (
     SimulationNotFoundError,
     SimulationAlreadyExistsError,
@@ -107,6 +109,45 @@ def list_simulations(
         raise HTTPException(status_code=500, detail=f"internal server error: {str(e)}")
 
 
+@router.get("/{simulation_id}", response_model=SimulationRead)
+def get_simulation(
+        simulation_id: int,
+        db: Session = Depends(get_db)
+):
+    """
+    Get a specific simulation by ID.
+
+    Returns full simulation details including balance and holdings.
+    """
+    try:
+        return get_simulation_by_id_service(db, simulation_id)
+    except SimulationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{simulation_id}/history", response_model=SimulationHistoryRead)
+def get_simulation_history(
+        simulation_id: int,
+        db: Session = Depends(get_db)
+):
+    """
+    Get complete transaction history for a simulation.
+
+    Returns chronologically ordered monthly records with:
+    - All balance operations (contributions, withdrawals, purchases, sales, dividends)
+    - Month-end balance totals
+    - Operation details including tickers where applicable
+    """
+    try:
+        return get_simulation_history_service(db, simulation_id)
+    except SimulationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/{simulation_id}", status_code=204)
 def delete_simulation(
         simulation_id: int,
@@ -130,24 +171,6 @@ def delete_simulation(
     try:
         delete_simulation_service(db, simulation_id)
         return None  # 204 returns no content
-    except SimulationNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/{simulation_id}", response_model=SimulationRead)
-def get_simulation(
-        simulation_id: int,
-        db: Session = Depends(get_db)
-):
-    """
-    Get a specific simulation by ID.
-
-    Returns full simulation details including balance and holdings.
-    """
-    try:
-        return get_simulation_by_id_service(db, simulation_id)
     except SimulationNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
