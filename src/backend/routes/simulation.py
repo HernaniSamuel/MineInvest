@@ -30,6 +30,7 @@ from src.backend.services.exceptions import (
 from src.backend.services.simulation_service import (
     create_simulation_service,
     list_simulations_service,
+    delete_simulation_service,
     get_simulation_by_id_service,
 )
 
@@ -106,6 +107,35 @@ def list_simulations(
         raise HTTPException(status_code=500, detail=f"internal server error: {str(e)}")
 
 
+@router.delete("/{simulation_id}", status_code=204)
+def delete_simulation(
+        simulation_id: int,
+        db: Session = Depends(get_db)
+):
+    """
+    Delete a simulation and all associated data.
+
+    This operation:
+    - Deletes the simulation
+    - Deletes all holdings (via cascade)
+    - Deletes all history records (via cascade)
+    - Removes simulation from asset ownership lists
+    - Deletes orphaned assets (assets with no owners)
+
+    **Warning**: This action is irreversible.
+
+    Returns:
+        204 No Content on success
+    """
+    try:
+        delete_simulation_service(db, simulation_id)
+        return None  # 204 returns no content
+    except SimulationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{simulation_id}", response_model=SimulationRead)
 def get_simulation(
         simulation_id: int,
@@ -114,17 +144,11 @@ def get_simulation(
     """
     Get a specific simulation by ID.
 
-    Returns full simulation details including balance and relationships.
-
-    Raises:
-        - 404: If simulation not found
+    Returns full simulation details including balance and holdings.
     """
-    simulation = get_simulation_by_id_service(db, simulation_id)
-
-    if not simulation:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Simulation with ID {simulation_id} not found"
-        )
-
-    return simulation
+    try:
+        return get_simulation_by_id_service(db, simulation_id)
+    except SimulationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

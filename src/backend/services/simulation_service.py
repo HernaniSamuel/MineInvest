@@ -14,14 +14,16 @@
 
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError
-from datetime import date
-from decimal import Decimal
-from typing import List, Optional, cast
+from typing import List, Optional
 
 from src.backend.models.simulation import SimulationORM
+from src.backend.models.holding import HoldingORM
+from src.backend.models.history_month import HistoryMonthORM
+from src.backend.models.asset import AssetORM
 from src.backend.schemas.simulation import SimulationCreate
-from src.backend.services.exceptions import SimulationAlreadyExistsError
+from src.backend.services.exceptions import SimulationAlreadyExistsError, SimulationNotFoundError
 
 
 def create_simulation_service(db: Session, simulation: SimulationCreate) -> SimulationORM:
@@ -106,29 +108,78 @@ def list_simulations_service(
         .all()
     )
 
-def get_simulation_by_id_service(db: Session, simulation_id: int) -> Optional[SimulationORM]:
+
+def delete_simulation_service(db: Session, simulation_id: int) -> None:
     """
-    Retrieves a single simulation by ID.
+    Delete a simulation and clean up associated data.
+
+    Cleanup process:
+    1. Find simulation
+    2. Get all owned tickers
+    3. Delete simulation (cascades to holdings and history via SQLAlchemy)
+    4. Remove simulation_id from each asset's simulation_ids list
+    5. Delete orphaned assets (assets with empty simulation_ids)
 
     Args:
-        db: SQLAlchemy database session
-        simulation_id: ID of the simulation to retrieve
+        db: Database session
+        simulation_id: ID of simulation to delete
 
-    Returns:
-        SimulationORM if found, None otherwise
+    Raises:
+        SimulationNotFoundError: If simulation doesn't exist
     """
-    return db.query(SimulationORM).filter(SimulationORM.id == simulation_id).first()
+    # 1. Find simulation
+    simulation = db.query(SimulationORM).filter(
+        SimulationORM.id == simulation_id
+    ).first()
+
+    if not simulation:
+        raise SimulationNotFoundError(
+            f"Simulation with ID {simulation_id} not found"
+        )
+
+    # 2. Delete simulation (cascades delete holdings and history automatically)
+    db.delete(simulation)
+    db.flush()  # Execute delete but don't commit yet
+
+    # 3. Find all assets that reference this simulation
+    # Use SQL query since JSON filtering varies by database
+    all_assets = db.query(AssetORM).all()
+
+    for asset in all_assets:
+        if simulation_id in asset.simulation_ids:
+            # Remove this simulation from asset's ownership list
+            asset.simulation_ids.remove(simulation_id)
+            flag_modified(asset, "simulation_ids")
+
+            # Delete asset if no simulations own it anymore
+            if not asset.simulation_ids:
+                db.delete(asset)
+
+    db.commit()
 
 
-def get_simulation_by_name_service(db: Session, name: str) -> Optional[SimulationORM]:
+def get_simulation_by_id_service(db: Session, simulation_id: int) -> SimulationORM:
     """
-    Retrieves a single simulation by name (case-insensitive).
+    Retrieve a simulation by ID.
 
     Args:
-        db: SQLAlchemy database session
-        name: Name of the simulation to retrieve
+        db: Database session
+        simulation_id: Simulation ID
 
     Returns:
-        SimulationORM if found, None otherwise
+        SimulationORM object
+
+    Raises:
+        SimulationNotFoundError: If not found
     """
-    return db.query(SimulationORM).filter(SimulationORM.name.ilike(name.strip())).first()
+    simulation = db.query(SimulationORM).filter(
+        SimulationORM.id == simulation_id
+    ).first()
+
+    if not simulation:
+        raise SimulationNotFoundError(
+            f"Simulation with ID {simulation_id} not found"
+        )
+
+    # noinspection PyTypeChecker
+    return simulation
