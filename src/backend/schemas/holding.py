@@ -16,6 +16,7 @@
 from decimal import Decimal
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from typing import List
 
 
 class HoldingCreate(BaseModel):
@@ -30,15 +31,33 @@ class HoldingCreate(BaseModel):
 
 
 class HoldingRead(BaseModel):
+    """Individual holding details."""
     id: int
-    simulation_id: int
     ticker: str
     name: str
     base_currency: str
     quantity: Decimal
     purchase_price: Decimal
-    weight: Decimal
     current_price: Decimal
     market_value: Decimal
+    weight: Decimal  # Percentage of portfolio
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PortfolioSummary(BaseModel):
+    """Portfolio summary statistics."""
+    total_holdings: int
+    total_market_value: Decimal
+    total_invested: Decimal
+    total_gain_loss: Decimal
+    gain_loss_percentage: Decimal
+
+
+class PortfolioRead(BaseModel):
+    """Complete portfolio with holdings and summary."""
+    simulation_id: int
+    simulation_name: str
+    current_balance: Decimal
+    holdings: List[HoldingRead]
+    summary: PortfolioSummary

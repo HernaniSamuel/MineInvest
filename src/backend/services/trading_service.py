@@ -23,6 +23,7 @@ from src.backend.schemas.balance import BalanceOperationRequest
 from src.backend.schemas.enums import Operation
 from src.backend.services.asset_service import AssetService
 from src.backend.services.balance_service import handle_balance_service
+from src.backend.services.holding_service import update_holdings_attributes
 from src.backend.services.exceptions import (
     InsufficientFundsError,
     InsufficientPositionError,
@@ -123,8 +124,11 @@ def purchase_asset_service(
         )
         db.add(new_holding)
 
-    # 7. Persist asset to database (moves from RAM if needed)
-    AssetService.persist_to_database(db, asset, simulation_id)
+        # 7. Persist asset to database (moves from RAM if needed)
+        AssetService.persist_to_database(db, asset, simulation_id)
+
+        # 8. Update all holdings attributes (NEW)
+        update_holdings_attributes(db, simulation_id)
 
     db.commit()
     db.refresh(sim)
@@ -205,7 +209,7 @@ def sell_asset_service(
     sim = handle_balance_service(db, simulation_id, balance_request)
 
     # 6. Update or delete holding
-    if remaining_quantity >= Decimal('0.01'):  # Keep if significant
+    if remaining_quantity >= Decimal('0.00000001'):  # Keep if significant
         # Partial sale
         holding.quantity = str(remaining_quantity)
         holding.current_price = str(price)
@@ -214,8 +218,11 @@ def sell_asset_service(
         # Complete sale
         db.delete(holding)
 
-        # 7. Remove from DB if no other sims own it
-        AssetService.remove_from_database_if_orphaned(db, asset.ticker, simulation_id)
+    # 7. Remove from DB if no other sims own it
+    AssetService.remove_from_database_if_orphaned(db, asset.ticker, simulation_id)
+
+    # Update all holdings attributes (NEW)
+    update_holdings_attributes(db, simulation_id)
 
     db.commit()
     db.refresh(sim)
