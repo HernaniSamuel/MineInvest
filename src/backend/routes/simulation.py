@@ -17,6 +17,7 @@ from typing import List
 from fastapi import Depends, APIRouter, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from src.backend.models.holding import HoldingORM
 from src.backend.models.session import get_db
 from src.backend.schemas.balance import BalanceOperationRequest
 from src.backend.schemas.simulation import SimulationCreate, SimulationRead, SimulationSumary
@@ -34,6 +35,12 @@ from src.backend.services.simulation_service import (
     list_simulations_service,
     delete_simulation_service,
     get_simulation_by_id_service,
+)
+from src.backend.schemas.snapshot import SnapshotInfo, RestoreResponse
+from src.backend.services.snapshot_service import (
+    create_monthly_snapshot,
+    restore_from_snapshot,
+    get_snapshot_info
 )
 
 router = APIRouter(prefix="/simulations", tags=["Simulations"])
@@ -85,6 +92,94 @@ def modify_balance(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{simulation_id}/snapshot", status_code=201)
+def create_snapshot(
+        simulation_id: int,
+        db: Session = Depends(get_db)
+):
+    """
+    Create a snapshot of the current simulation state.
+
+    Captures current balance and holdings. Only one snapshot
+    is kept per simulation (the most recent).
+
+    Use this before making risky operations to enable undo.
+    """
+    try:
+        snapshot = create_monthly_snapshot(db, simulation_id)
+        return {
+            "message": "Snapshot created successfully",
+            "month_date": snapshot.month_date.isoformat(),
+            "balance": snapshot.balance,
+            "holdings_count": len(snapshot.holdings_snapshot)
+        }
+    except SimulationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{simulation_id}/restore", response_model=RestoreResponse)
+def restore_snapshot(
+        simulation_id: int,
+        db: Session = Depends(get_db)
+):
+    """
+    Restore simulation to the state of the most recent snapshot.
+
+    **WARNING**: This will:
+    - Revert balance to snapshot value
+    - Delete all holdings added this month
+    - Restore holdings from snapshot
+    - Clear all operations in current month (except dividends)
+
+    **Cannot be undone!** Use with caution.
+
+    Only works if snapshot is for the current month.
+    """
+    try:
+        sim = restore_from_snapshot(db, simulation_id)
+
+        # Count restored holdings
+        holdings_count = db.query(HoldingORM).filter(
+            HoldingORM.simulation_id == simulation_id
+        ).count()
+
+        return RestoreResponse(
+            success=True,
+            message="Simulation restored to snapshot state",
+            simulation_id=sim.id,
+            restored_balance=sim.balance,
+            restored_holdings_count=holdings_count
+        )
+    except SimulationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{simulation_id}/snapshot", response_model=SnapshotInfo)
+def get_snapshot(
+        simulation_id: int,
+        db: Session = Depends(get_db)
+):
+    """
+    Get information about the current snapshot.
+
+    Returns snapshot details including whether it can be restored
+    (only restorable if snapshot is for the current month).
+    """
+    try:
+        info = get_snapshot_info(db, simulation_id)
+        if info is None:
+            return SnapshotInfo(exists=False)
+        return SnapshotInfo(**info)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/", response_model=List[SimulationRead])

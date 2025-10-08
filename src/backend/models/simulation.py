@@ -31,6 +31,7 @@ class SimulationORM(Base):
 
     holdings = relationship('HoldingORM', back_populates='simulation', cascade="all, delete-orphan")
     history = relationship("HistoryMonthORM", back_populates="simulation", cascade="all, delete-orphan")
+    snapshots = relationship("MonthlySnapshotORM", back_populates="simulation", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint('name', name='uniq_simulation_name'),
