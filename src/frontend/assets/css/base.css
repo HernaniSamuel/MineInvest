@@ -1,0 +1,65 @@
+/* Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Numbers use monospace */
+.stat-value,
+.stat-item-value {
+    font-family: var(--font-mono);
+}
+
+/* Bootstrap dark theme overrides */
+.bg-dark-custom {
+    background-color: var(--bg-secondary) !important;
+}
+
+.form-select,
+.form-control {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.form-select:focus,
+.form-control:focus {
+    background-color: var(--bg-elevated);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 0.2rem var(--color-primary-light);
+}
+
+.modal-content {
+    background-color: var(--bg-secondary);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}

@@ -14,12 +14,26 @@
 
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from src.backend.routes import simulation, trading, holding, time
 
 app = FastAPI(
     title="MineInvest API",
     description="Investment simulation platform with historical data",
     version="1.0.0"
+)
+
+# CORS settings - allow everything!
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:3000", 
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],  
+    allow_headers=["*"],  
 )
 
 @app.get("/")
