@@ -1,0 +1,263 @@
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --bg-elevated: #374151;
+  --border-color: #374151;
+  
+  /* IMPROVED TEXT COLORS - Better Contrast */
+  --text-primary: #ffffff;           /* Changed from #f9fafb - Pure white */
+  --text-secondary: #e5e7eb;         /* Changed from #d1d5db - Lighter */
+  --text-muted: #b0b5c0;             /* Changed from #9ca3af - More visible */
+  
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-primary: #3b82f6;
+  --color-warning: #f59e0b;
+  --color-info: #06b6d4;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px; /* Slightly larger base font */
+}
+
+/* Bootstrap overrides for better contrast */
+.text-muted {
+  color: var(--text-muted) !important;
+  opacity: 1; /* Remove any Bootstrap opacity */
+}
+
+.form-text {
+  color: var(--text-muted) !important;
+}
+
+.modal-content {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.form-control, .form-select {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  font-size: 15px; /* Larger input text */
+}
+
+.form-control:focus, .form-select:focus {
+  background-color: var(--bg-elevated);
+  border-color: var(--color-primary);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+}
+
+.form-control::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.form-check-input {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+.form-check-input:checked {
+  background-color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.form-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.table-dark {
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--border-color);
+  --bs-table-color: var(--text-primary);
+}
+
+.table-dark th {
+  color: var(--text-secondary);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.table-dark td {
+  color: var(--text-primary);
+}
+
+/* Modal improvements */
+.modal-header {
+  border-bottom-color: var(--border-color);
+}
+
+.modal-footer {
+  border-top-color: var(--border-color);
+}
+
+.modal-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Alert improvements */
+.alert {
+  border: 1px solid;
+}
+
+.alert-info {
+  background-color: rgba(6, 182, 212, 0.1);
+  border-color: rgba(6, 182, 212, 0.3);
+  color: var(--text-primary);
+}
+
+.alert-danger {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--text-primary);
+}
+
+.alert-success {
+  background-color: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--text-primary);
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Small text improvements */
+small {
+  color: var(--text-muted);
+}
+
+/* Button text improvements */
+.btn {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.btn-lg {
+  font-size: 16px;
+}
+
+.btn-sm {
+  font-size: 13px;
+}
+/* Simulation card improvements */
+.simulation-card {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.simulation-card h5 {
+  color: var(--text-primary);
+  font-size: 1.25rem;
+}
+
+.simulation-card small {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.simulation-card .fw-bold {
+  color: var(--text-primary);
+}
+
+/* Stat card improvements */
+.stat-card-large {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  transition: all 0.25s ease;
+  height: 100%;
+}
+
+.stat-card-large small {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.stat-card-large .fw-bold {
+  color: var(--text-primary);
+  font-size: 1.5rem;
+}
+/* Chart card improvements */
+.chart-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.chart-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+}
+
+.chart-header h5 {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.chart-body {
+  padding: 1.5rem;
+}
+/* Toast customization */
+.Toastify__toast-container {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.Toastify__toast {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    color: var(--text-primary);
+}
+
+.Toastify__toast--success {
+    border-left: 4px solid var(--color-success);
+}
+
+.Toastify__toast--error {
+    border-left: 4px solid var(--color-danger);
+}
+
+.Toastify__toast--info {
+    border-left: 4px solid var(--color-info);
+}
+
+.Toastify__toast--warning {
+    border-left: 4px solid var(--color-warning);
+}
+
+.Toastify__progress-bar {
+    background: linear-gradient(90deg, var(--color-success), var(--color-primary));
+}
+
+.Toastify__close-button {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.Toastify__close-button:hover {
+    opacity: 1;
+}
