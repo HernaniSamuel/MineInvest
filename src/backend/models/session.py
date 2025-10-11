@@ -23,7 +23,7 @@ from src.backend.models.history_month import HistoryMonthORM
 from src.backend.models.asset import AssetORM
 from src.backend.models.ipca_cache import IPCACacheORM
 from src.backend.models.monthly_snapshot import MonthlySnapshotORM
-
+from src.backend.models.exchange_rate import ExchangeRateORM
 
 engine = create_engine('sqlite:///simulation.db')
 SessionLocal = sessionmaker(bind=engine)

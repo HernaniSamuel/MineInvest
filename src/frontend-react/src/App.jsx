@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ToastContainer } from 'react-toastify';
 import SimulationList from './components/SimulationList';
 import SimulationView from './components/SimulationView';
+import TradingScreen from "./components/TradingScreen.jsx";
 import { simulationsAPI } from './services/api';
 
 function App() {
@@ -71,13 +72,11 @@ function App() {
                 />
             )}
             
-            {currentScreen === 'trading' && (
-                <div className="container-fluid py-5">
-                    <h2>Trading Screen - Coming Soon</h2>
-                    <button className="btn btn-secondary" onClick={() => setCurrentScreen('view')}>
-                        ← Back to Simulation
-                    </button>
-                </div>
+            {currentScreen === 'trading' && currentSimulation && (
+                <TradingScreen
+                    simulation={currentSimulation}
+                    onBack={() => setCurrentScreen('view')}
+                />
             )}
             
             {/* Toast Container - ADD THIS */}

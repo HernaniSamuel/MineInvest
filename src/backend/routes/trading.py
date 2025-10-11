@@ -48,27 +48,72 @@ def search_asset(
     """
     Search for an asset across RAM cache, database, or yfinance.
 
-    Returns complete historical data. If simulation_id provided,
-    validates asset existed at simulation's current date.
+    Returns complete historical data up to simulation date. If simulation_id provided,
+    validates asset existed at simulation's current date and filters data accordingly.
     """
     try:
         asset = AssetService.search_asset(db, ticker, simulation_id)
 
+        # Base response
         response = AssetSearchResponse(
             ticker=asset.ticker,
             name=asset.name,
             base_currency=asset.base_currency,
             start_date=asset.start_date.isoformat(),
-            current_price=None
+            current_price=None,
+            historical_data=[]
         )
 
-        # If simulation provided, include current price
+        # If simulation provided, include filtered historical data and current price
         if simulation_id:
             from src.backend.models.simulation import SimulationORM
+            from src.backend.schemas.trading import MonthlyDataPoint
+            from decimal import Decimal
+            from datetime import date
+
             sim = db.query(SimulationORM).filter(SimulationORM.id == simulation_id).first()
             if sim:
-                price = AssetService.get_price_at_date(asset, sim.current_date)
-                response.current_price = price
+                # Get historical data up to simulation date
+                filtered_data = AssetService.get_historical_data_until_date(
+                    asset,
+                    sim.current_date
+                )
+
+                # Convert to Pydantic models
+                response.historical_data = [
+                    MonthlyDataPoint(
+                        date=date.fromisoformat(data["date"]),
+                        open=Decimal(data["open"]),
+                        high=Decimal(data["high"]),
+                        low=Decimal(data["low"]),
+                        close=Decimal(data["close"]),
+                        dividends=Decimal(data["dividends"]) if data.get("dividends") else None,
+                        splits=Decimal(data["splits"]) if data.get("splits") else None
+                    )
+                    for data in filtered_data
+                ]
+
+                # Set current price (last close price)
+                if response.historical_data:
+                    response.current_price = response.historical_data[-1].close
+        else:
+            # No simulation - return all historical data
+            from src.backend.schemas.trading import MonthlyDataPoint
+            from decimal import Decimal
+            from datetime import date
+
+            response.historical_data = [
+                MonthlyDataPoint(
+                    date=date.fromisoformat(data["date"]),
+                    open=Decimal(data["open"]),
+                    high=Decimal(data["high"]),
+                    low=Decimal(data["low"]),
+                    close=Decimal(data["close"]),
+                    dividends=Decimal(data["dividends"]) if data.get("dividends") else None,
+                    splits=Decimal(data["splits"]) if data.get("splits") else None
+                )
+                for data in asset.monthly_data
+            ]
 
         return response
 
@@ -76,7 +121,6 @@ def search_asset(
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
 
 @router.post("/{simulation_id}/purchase", response_model=SimulationRead)
 def purchase_asset(

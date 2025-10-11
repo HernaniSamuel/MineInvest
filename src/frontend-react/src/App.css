@@ -261,3 +261,15 @@ small {
 .Toastify__close-button:hover {
     opacity: 1;
 }
+
+/* Trading Screen Styles */
+.hover-highlight:hover {
+    background-color: var(--bg-elevated) !important;
+    transform: translateX(4px);
+    transition: all 0.15s ease;
+}
+
+/* Search results scrollbar */
+.list-group {
+    scrollbar-width: thin;
+}

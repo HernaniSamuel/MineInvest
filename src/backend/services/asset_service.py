@@ -161,3 +161,27 @@ class AssetService:
             start_date=orm.start_date,
             monthly_data=orm.monthly_data
         )
+
+    @staticmethod
+    def get_historical_data_until_date(asset: AssetData, target_date: date) -> list:
+        """
+        Get all monthly data from asset start date up to target date.
+
+        Args:
+            asset: Asset data object
+            target_date: End date (simulation current date)
+
+        Returns:
+            List of monthly data points up to and including target_date's month
+        """
+        target_month = target_date.replace(day=1)
+        filtered_data = []
+
+        for month_data in asset.monthly_data:
+            month_date = date.fromisoformat(month_data["date"])
+            if month_date <= target_month:
+                filtered_data.append(month_data)
+            else:
+                break  # Data is chronological, can stop here
+
+        return filtered_data

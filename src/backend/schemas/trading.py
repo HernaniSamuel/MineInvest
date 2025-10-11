@@ -15,17 +15,30 @@
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
+from datetime import date
+
+
+class MonthlyDataPoint(BaseModel):
+    """Single month of OHLC data"""
+    date: date
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    dividends: Optional[Decimal] = None
+    splits: Optional[Decimal] = None
 
 
 class AssetSearchResponse(BaseModel):
-    """Response for asset search."""
+    """Response for asset search with historical data."""
 
     ticker: str
     name: str
     base_currency: str
     start_date: str  # ISO format
     current_price: Optional[Decimal] = None  # Price at simulation date if provided
+    historical_data: List[MonthlyDataPoint] = []  # All data up to simulation date
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -34,7 +47,18 @@ class AssetSearchResponse(BaseModel):
                 "name": "Apple Inc.",
                 "base_currency": "USD",
                 "start_date": "1980-12-12",
-                "current_price": "150.25"
+                "current_price": "150.25",
+                "historical_data": [
+                    {
+                        "date": "2024-01-01",
+                        "open": "145.50",
+                        "high": "152.30",
+                        "low": "144.20",
+                        "close": "150.25",
+                        "dividends": "0.25",
+                        "splits": None
+                    }
+                ]
             }
         }
     )
@@ -77,6 +101,3 @@ class SellRequest(BaseModel):
     @classmethod
     def validate_ticker(cls, v: str) -> str:
         return v.strip().upper()
-
-
-# TODO: Verificar possibilidade de unificação de compra/venda de ativos em uma só operação
