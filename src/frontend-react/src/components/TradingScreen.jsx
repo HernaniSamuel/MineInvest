@@ -3,7 +3,7 @@ import { Container, Row, Col, Button, Form, ListGroup, Spinner, Badge, Alert } f
 import axios from 'axios';
 import { showToast } from '../utils/toast';
 import { formatCurrency } from '../utils/formatters';
-import PriceChart from './PriceChart';
+import PriceChart from './PriceChart/PriceChart.jsx';
 import TradingModal from './TradingModal';
 
 function TradingScreen({ simulation, onBack }) {
@@ -21,6 +21,10 @@ function TradingScreen({ simulation, onBack }) {
     // Local simulation state (updates after trades)
     const [currentSimulation, setCurrentSimulation] = useState(simulation);
 
+    // Holdings data
+    const [holdings, setHoldings] = useState([]);
+    const [currentHolding, setCurrentHolding] = useState(null);
+
     const searchTimeoutRef = useRef(null);
     const searchInputRef = useRef(null);
 
@@ -28,6 +32,38 @@ function TradingScreen({ simulation, onBack }) {
     useEffect(() => {
         setCurrentSimulation(simulation);
     }, [simulation]);
+
+    // Fetch holdings when simulation changes
+    useEffect(() => {
+        if (currentSimulation?.id) {
+            fetchHoldings();
+        }
+    }, [currentSimulation?.id]);
+
+    // Update current holding when selected asset or holdings change
+    useEffect(() => {
+        if (selectedAsset && holdings.length > 0) {
+            const holding = holdings.find(
+                h => h.ticker === selectedAsset.symbol
+            );
+            setCurrentHolding(holding || null);
+        } else {
+            setCurrentHolding(null);
+        }
+    }, [selectedAsset, holdings]);
+
+    const fetchHoldings = async () => {
+        try {
+            const response = await axios.get(
+                `http://127.0.0.1:8000/simulations/${currentSimulation.id}/holdings`
+            );
+            setHoldings(response.data);
+            console.log('Holdings fetched:', response.data);
+        } catch (error) {
+            console.error('Failed to fetch holdings:', error);
+            setHoldings([]);
+        }
+    };
 
     // Debounced search
     useEffect(() => {
@@ -148,7 +184,10 @@ function TradingScreen({ simulation, onBack }) {
         // Update local simulation state
         setCurrentSimulation(updatedSimulation);
 
-        // Reload asset data to reflect changes
+        // Reload holdings to reflect changes
+        await fetchHoldings();
+
+        // Reload asset data
         if (selectedAsset) {
             await reloadAssetData(selectedAsset.symbol);
         }
@@ -351,14 +390,7 @@ function TradingScreen({ simulation, onBack }) {
                                             <small className="text-muted d-block">Currency</small>
                                             <strong>{selectedAsset.apiData.base_currency}</strong>
                                         </div>
-                                        {selectedAsset.apiData.current_price && (
-                                            <div className="mb-2">
-                                                <small className="text-muted d-block">Current Price</small>
-                                                <strong className="text-success">
-                                                    {selectedAsset.apiData.base_currency} {parseFloat(selectedAsset.apiData.current_price).toFixed(2)}
-                                                </strong>
-                                            </div>
-                                        )}
+
                                         {selectedAsset.apiData.historical_data && (
                                             <div className="mb-2">
                                                 <small className="text-muted d-block">Data Points</small>
@@ -366,6 +398,65 @@ function TradingScreen({ simulation, onBack }) {
                                             </div>
                                         )}
                                     </>
+                                )}
+
+                                {/* Current Position Section */}
+                                <hr className="my-3" />
+                                <h6 className="mb-3">
+                                    <i className="bi bi-briefcase me-2"></i>
+                                    Your Position
+                                </h6>
+
+                                {currentHolding ? (
+                                    <>
+                                        <div className="mb-2">
+                                            <small className="text-muted d-block">Quantity</small>
+                                            <strong>{parseFloat(currentHolding.quantity).toFixed(6)} shares</strong>
+                                        </div>
+                                        <div className="mb-2">
+                                            <small className="text-muted d-block">Market Value</small>
+                                            <strong className="text-info">
+                                                {formatCurrency(parseFloat(currentHolding.market_value), currentSimulation.base_currency)}
+                                            </strong>
+                                        </div>
+
+                                        <div className="mb-2">
+                                            <small className="text-muted d-block">Current Price</small>
+                                            <strong>
+                                                {formatCurrency(parseFloat(currentHolding.current_price), currentSimulation.base_currency)}
+                                            </strong>
+                                        </div>
+                                        {(() => {
+                                            const purchasePrice = parseFloat(currentHolding.purchase_price);
+                                            const currentPrice = parseFloat(currentHolding.current_price);
+                                            const gainLoss = ((currentPrice - purchasePrice) / purchasePrice) * 100;
+                                            const isPositive = gainLoss >= 0;
+
+                                            return (
+                                                <div className="mb-2">
+                                                    <small className="text-muted d-block">Gain/Loss</small>
+                                                    <strong className={isPositive ? 'text-success' : 'text-danger'}>
+                                                        {isPositive ? '+' : ''}{gainLoss.toFixed(2)}%
+                                                    </strong>
+                                                </div>
+                                            );
+                                        })()}
+                                    </>
+                                ) : (
+                                    <Alert
+                                        variant="secondary"
+                                        className="mb-0 py-2"
+                                        style={{
+                                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            color: 'var(--text-muted)'
+                                        }}
+                                    >
+                                        <small>
+                                            <i className="bi bi-info-circle me-2"></i>
+                                            You don't own this asset yet
+                                        </small>
+                                    </Alert>
                                 )}
 
                                 <div className="mt-3 d-grid gap-2">
@@ -381,6 +472,7 @@ function TradingScreen({ simulation, onBack }) {
                                         variant="danger"
                                         size="sm"
                                         onClick={handleSellClick}
+                                        disabled={!currentHolding}
                                     >
                                         <i className="bi bi-dash-circle me-2"></i>
                                         Sell Asset
@@ -423,6 +515,7 @@ function TradingScreen({ simulation, onBack }) {
                 asset={selectedAsset}
                 action={tradingAction}
                 onSuccess={handleTradingSuccess}
+                currentHolding={currentHolding}
             />
         </div>
     );

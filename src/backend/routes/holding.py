@@ -41,7 +41,7 @@ def list_holdings(
 
     Returns current positions with:
     - Quantity owned
-    - Purchase price (weighted average)
+    - Purchase price
     - Current market price
     - Market value
     - Portfolio weight percentage

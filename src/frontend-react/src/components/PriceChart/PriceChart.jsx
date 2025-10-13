@@ -163,7 +163,7 @@ function PriceChart({ assetData, symbol }) {
     const [chartType, setChartType] = useState('candlestick');
     const [indicators, setIndicators] = useState({
         sma20: false, sma50: false, sma200: false,
-        ema12: false, ema26: false, volume: true,
+        ema12: false, ema26: false, volume: false,
     });
     const [crosshairData, setCrosshairData] = useState(null);
     const [drawingMode, setDrawingMode] = useState(null);

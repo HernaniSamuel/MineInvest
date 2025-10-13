@@ -382,14 +382,29 @@ def sell_asset_service(
 
     # Validate sufficient position
     holding_quantity = Decimal(str(holding.quantity))
-    if quantity_to_sell > holding_quantity:
-        max_amount = holding_quantity * converted_price
-        raise InsufficientPositionError(
-            f"Insufficient position. You own {holding_quantity} shares. "
-            f"At current price of {converted_price} {simulation_currency}, "
-            f"you can sell up to {max_amount:.2f} {simulation_currency}"
-        )
 
+    # Calculate the maximum sellable amount in currency
+    max_sellable_amount = holding_quantity * converted_price
+
+    # If trying to sell more than we have OR within 1% of total position, sell EVERYTHING
+    difference_amount = desired_amount - max_sellable_amount
+    percentage_diff = abs(difference_amount / max_sellable_amount) if max_sellable_amount > 0 else Decimal('0')
+
+    if quantity_to_sell > holding_quantity:
+        # If difference is less than 1% OR less than 0.01 in currency, sell everything
+        if percentage_diff < Decimal("0.01") or abs(difference_amount) < Decimal("0.01"):
+            logger.info(
+                f"Selling entire position: requested {desired_amount}, "
+                f"max available {max_sellable_amount}, selling all {holding_quantity} shares"
+            )
+            quantity_to_sell = holding_quantity
+        else:
+            # Actually insufficient - reject it
+            raise InsufficientPositionError(
+                f"Insufficient position. You own {holding_quantity} shares. "
+                f"At current price of {converted_price} {simulation_currency}, "
+                f"you can sell up to {max_sellable_amount:.2f} {simulation_currency}"
+            )
     # Add proceeds to balance using authorized service
     balance_operation = BalanceOperationRequest(
         amount=desired_amount,

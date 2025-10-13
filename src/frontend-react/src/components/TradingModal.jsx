@@ -4,7 +4,7 @@ import axios from 'axios';
 import { showToast } from '../utils/toast';
 import { formatCurrency } from '../utils/formatters';
 
-function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
+function TradingModal({ show, onHide, simulation, asset, action, onSuccess, currentHolding }) {
     const [amount, setAmount] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -39,7 +39,6 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
         const fetchConversion = async () => {
             setLoadingConversion(true);
             try {
-                // Fetch exchange rate at simulation date
                 const response = await axios.get(
                     `http://127.0.0.1:8000/api/exchange/rate`,
                     {
@@ -110,7 +109,7 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
                 `http://127.0.0.1:8000/assets/${simulation.id}/${endpoint}`,
                 {
                     ticker: asset.symbol,
-                    desired_amount: amountToSend  // Número com 2 casas decimais
+                    desired_amount: amountToSend
                 }
             );
 
@@ -120,10 +119,8 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
                 `${asset.symbol} ${isBuying ? 'purchased' : 'sold'} successfully!`
             );
 
-            // Callback with updated simulation
             onSuccess(response.data);
 
-            // Reset and close
             setAmount('');
             setError(null);
             onHide();
@@ -150,14 +147,14 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
 
     const handleMaxAmount = () => {
         if (isBuying) {
-            setAmount(simulation.balance);
+            // Para compra: usa todo o saldo disponível
+            setAmount(parseFloat(simulation.balance).toFixed(2));
+        } else {
+            // Para venda: usa o market_value do holding
+            if (currentHolding?.market_value) {
+                setAmount(parseFloat(currentHolding.market_value).toFixed(2));
+            }
         }
-    };
-
-    // Handle step increment/decrement by asset price
-    const handleStepChange = (e) => {
-        const newValue = e.target.value;
-        setAmount(newValue);
     };
 
     // Calculate step value (price of one share)
@@ -188,7 +185,7 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
                 </Modal.Title>
             </Modal.Header>
 
-            <Form onSubmit={handleSubmit}>
+            <Form onSubmit={handleSubmit} noValidate>
                 <Modal.Body className="bg-dark text-light">
                     {error && (
                         <Alert variant="danger" className="mb-3">
@@ -259,29 +256,27 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
                             <Form.Control
                                 type="number"
                                 step={stepValue}
-                                min="0"
-                                max={isBuying ? simulation.balance : undefined}
+                                min="0.01"
+                                max={isBuying ? simulation.balance : (currentHolding?.market_value || undefined)}
                                 value={amount}
-                                onChange={handleStepChange}
-                                placeholder="1000.00"
+                                onChange={(e) => setAmount(e.target.value)}
+                                placeholder={isBuying ? "1000.00" : (currentHolding?.market_value || "0.00")}
                                 autoFocus
                                 required
                                 disabled={loading || loadingConversion}
                             />
-                            {isBuying && (
-                                <Button
-                                    variant="outline-secondary"
-                                    onClick={handleMaxAmount}
-                                    disabled={loading || loadingConversion}
-                                >
-                                    Max
-                                </Button>
-                            )}
+                            <Button
+                                variant="outline-secondary"
+                                onClick={handleMaxAmount}
+                                disabled={loading || loadingConversion || (!isBuying && !currentHolding)}
+                            >
+                                Max
+                            </Button>
                         </InputGroup>
                         <Form.Text className="text-muted">
-                            {needsConversion
-                                ? `Amount will be used to buy ${asset.symbol} (priced in ${assetCurrency}). Use arrows to increment by 1 share (${simSymbol}${stepValue})`
-                                : `Enter amount in ${simulationCurrency}. Use arrows to increment by 1 share (${simSymbol}${stepValue})`
+                            {isBuying
+                                ? `Use Max to invest all available balance. Arrows increment by ${simSymbol}${stepValue}`
+                                : `Use Max to sell entire position (${currentHolding ? formatCurrency(parseFloat(currentHolding.market_value), simulationCurrency) : 'N/A'}). Arrows increment by ${simSymbol}${stepValue}`
                             }
                         </Form.Text>
                     </Form.Group>
