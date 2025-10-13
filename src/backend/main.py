@@ -15,7 +15,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.backend.routes import simulation, trading, holding, time, assets
+from src.backend.routes import simulation, trading, holding, time, assets, exchange
 
 app = FastAPI(
     title="MineInvest API",
@@ -47,3 +47,4 @@ app.include_router(trading.router)
 app.include_router(holding.router)
 app.include_router(time.router)
 app.include_router(assets.router)
+app.include_router(exchange.router)

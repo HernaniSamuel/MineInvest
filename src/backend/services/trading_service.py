@@ -20,8 +20,10 @@ from src.backend.models.simulation import SimulationORM
 from src.backend.models.holding import HoldingORM
 from src.backend.schemas.trading import PurchaseRequest, SellRequest
 from src.backend.schemas.simulation import SimulationRead
+from src.backend.schemas.balance import BalanceOperationRequest, Operation
 from src.backend.services.asset_service import AssetService
 from src.backend.services.exchange_service import ExchangeService
+from src.backend.services.balance_service import handle_balance_service
 from src.backend.services.exceptions import (
     AssetNotFoundError,
     InsufficientFundsError,
@@ -47,8 +49,8 @@ def purchase_asset_service(
     3. Converts price to simulation currency (if needed)
     4. Calculates quantity of shares to purchase
     5. Validates sufficient balance
-    6. Deducts amount from balance
-    7. Creates or updates holding with weighted average price
+    6. Deducts amount from balance via handle_balance_service
+    7. Creates or updates holding (preserves initial purchase price)
 
     Currency Conversion:
         If the asset's currency differs from the simulation's base currency,
@@ -70,7 +72,7 @@ def purchase_asset_service(
         >>> # 2. Get USD/BRL rate (e.g., 4.87)
         >>> # 3. Convert: 180.50 * 4.87 = 879.04 BRL per share
         >>> # 4. Calculate shares: 5000 / 879.04 = 5.6875 shares
-        >>> # 5. Deduct 5000 BRL from balance
+        >>> # 5. Deduct 5000 BRL from balance via handle_balance_service
         >>> # 6. Add 5.6875 shares to holdings
 
     Args:
@@ -142,7 +144,7 @@ def purchase_asset_service(
             target_date=simulation.current_date
         )
 
-        exchange_rate = exchange_response.rate
+        exchange_rate = Decimal(str(exchange_response.rate))
         converted_price = original_price * exchange_rate
 
         logger.info(
@@ -170,8 +172,14 @@ def purchase_asset_service(
             f"Required: {desired_amount} {simulation_currency}"
         )
 
-    # Deduct amount from balance
-    simulation.balance -= desired_amount
+    # Deduct amount from balance using authorized service
+    balance_operation = BalanceOperationRequest(
+        amount=desired_amount,
+        operation=Operation.REMOVE,
+        category="purchase",
+        ticker=request.ticker
+    )
+    simulation = handle_balance_service(db, simulation_id, balance_operation)
     logger.info(f"Balance after purchase: {simulation.balance} {simulation_currency}")
 
     # Create or update holding
@@ -181,27 +189,40 @@ def purchase_asset_service(
     ).first()
 
     if holding:
-        # Update existing holding with weighted average price
-        total_quantity = holding.quantity + quantity
-        new_average_price = (
-                (holding.average_price * holding.quantity + converted_price * quantity)
-                / total_quantity
-        )
+        # Update existing holding - only quantity changes, purchase_price stays the same
+        old_quantity = Decimal(str(holding.quantity))
+        new_quantity = old_quantity + quantity
+
+        # Update calculated fields
+        market_value = new_quantity * converted_price
 
         logger.info(
-            f"Updating holding: {holding.quantity} + {quantity} = {total_quantity} shares, "
-            f"Average price: {holding.average_price} → {new_average_price}"
+            f"Updating holding: {old_quantity} + {quantity} = {new_quantity} shares, "
+            f"Purchase price remains: {holding.purchase_price}"
         )
 
-        holding.average_price = new_average_price
-        holding.quantity = total_quantity
+        holding.quantity = str(new_quantity)
+        holding.current_price = str(converted_price)
+        holding.market_value = str(market_value)
+        # weight will be recalculated elsewhere if needed
     else:
-        # Create new holding
+        # Create new holding with initial purchase price
+        market_value = quantity * converted_price
+
+        # Calculate initial weight (percentage of total portfolio)
+        total_portfolio_value = simulation.balance + market_value
+        weight = (market_value / total_portfolio_value) * 100 if total_portfolio_value > 0 else Decimal('0')
+
         holding = HoldingORM(
             simulation_id=simulation_id,
             ticker=request.ticker,
-            quantity=quantity,
-            average_price=converted_price
+            name=asset.name,
+            base_currency=asset.base_currency,
+            quantity=str(quantity),
+            purchase_price=str(converted_price),  # Stores first purchase price
+            weight=str(weight),
+            current_price=str(converted_price),
+            market_value=str(market_value)
         )
         db.add(holding)
 
@@ -232,7 +253,7 @@ def sell_asset_service(
     3. Converts price to simulation currency (if needed)
     4. Calculates quantity of shares to sell
     5. Validates sufficient position
-    6. Adds proceeds to balance
+    6. Adds proceeds to balance via handle_balance_service
     7. Updates or removes holding
 
     Currency Conversion:
@@ -255,7 +276,7 @@ def sell_asset_service(
         >>> # 3. Convert: 185.75 * 4.92 = 913.89 BRL per share
         >>> # 4. Calculate shares to sell: 3000 / 913.89 = 3.2826 shares
         >>> # 5. Validate position has at least 3.2826 shares
-        >>> # 6. Add 3000 BRL to balance
+        >>> # 6. Add 3000 BRL to balance via handle_balance_service
         >>> # 7. Reduce position by 3.2826 shares
 
     Args:
@@ -300,7 +321,7 @@ def sell_asset_service(
 
     logger.info(
         f"Current position: {holding.quantity} shares at "
-        f"average price {holding.average_price}"
+        f"purchase price {holding.purchase_price}"
     )
 
     # Validate and fetch asset
@@ -338,7 +359,7 @@ def sell_asset_service(
             target_date=simulation.current_date
         )
 
-        exchange_rate = exchange_response.rate
+        exchange_rate = Decimal(str(exchange_response.rate))
         converted_price = original_price * exchange_rate
 
         logger.info(
@@ -360,27 +381,37 @@ def sell_asset_service(
     )
 
     # Validate sufficient position
-    if quantity_to_sell > holding.quantity:
-        max_amount = holding.quantity * converted_price
+    holding_quantity = Decimal(str(holding.quantity))
+    if quantity_to_sell > holding_quantity:
+        max_amount = holding_quantity * converted_price
         raise InsufficientPositionError(
-            f"Insufficient position. You own {holding.quantity} shares. "
+            f"Insufficient position. You own {holding_quantity} shares. "
             f"At current price of {converted_price} {simulation_currency}, "
             f"you can sell up to {max_amount:.2f} {simulation_currency}"
         )
 
-    # Add proceeds to balance
-    simulation.balance += desired_amount
+    # Add proceeds to balance using authorized service
+    balance_operation = BalanceOperationRequest(
+        amount=desired_amount,
+        operation=Operation.ADD,
+        category="sale",
+        ticker=request.ticker
+    )
+    simulation = handle_balance_service(db, simulation_id, balance_operation)
     logger.info(f"Balance after sale: {simulation.balance} {simulation_currency}")
 
     # Update or remove holding
-    holding.quantity -= quantity_to_sell
+    new_quantity = holding_quantity - quantity_to_sell
 
     # Remove holding if position is effectively zero
-    if holding.quantity < Decimal("0.000001"):
+    if new_quantity < Decimal("0.000001"):
         logger.info("Position closed completely, removing holding")
         db.delete(holding)
     else:
-        logger.info(f"Position reduced to {holding.quantity} shares")
+        logger.info(f"Position reduced to {new_quantity} shares")
+        holding.quantity = str(new_quantity)
+        holding.current_price = str(converted_price)
+        holding.market_value = str(new_quantity * converted_price)
 
     # Commit transaction
     db.commit()

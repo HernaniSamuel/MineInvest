@@ -17,6 +17,7 @@ from sqlalchemy import Column, Integer, String, Date, UniqueConstraint
 from sqlalchemy.orm import relationship
 from decimal import Decimal
 from src.backend.models.base import Base
+from src.backend.models.custom_types import PreciseDecimal
 
 
 class SimulationORM(Base):
@@ -26,7 +27,7 @@ class SimulationORM(Base):
     name = Column(String, nullable=False, index=True, unique=True)
     start_date = Column(Date, nullable=False)
     base_currency = Column(String, nullable=False)
-    balance = Column(String, default=Decimal("0.0000000000000000"), nullable=False)
+    balance = Column(PreciseDecimal, default=Decimal("0.0000000000000000"), nullable=False)
     current_date = Column(Date, nullable=False)
 
     holdings = relationship('HoldingORM', back_populates='simulation', cascade="all, delete-orphan")

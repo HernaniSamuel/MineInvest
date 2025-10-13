@@ -52,14 +52,16 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
                 );
 
                 const rate = response.data.rate;
-                setConversionRate(rate);
-                setConvertedPrice(parseFloat(originalPrice) * rate);
+                setConversionRate(parseFloat(rate));
+                setConvertedPrice(parseFloat(originalPrice) * parseFloat(rate));
 
                 console.log('Exchange rate fetched:', {
                     from: assetCurrency,
                     to: simulationCurrency,
                     rate: rate,
-                    fromCache: response.data.from_cache
+                    fromCache: response.data.from_cache,
+                    originalPrice: originalPrice,
+                    convertedPrice: parseFloat(originalPrice) * parseFloat(rate)
                 });
             } catch (err) {
                 console.error('Conversion error:', err);
@@ -93,6 +95,9 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
             return;
         }
 
+        // Round to 2 decimal places for backend validation
+        const amountToSend = Math.round(parsedAmount * 100) / 100;
+
         setLoading(true);
 
         const endpoint = isBuying ? 'purchase' : 'sell';
@@ -105,7 +110,7 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
                 `http://127.0.0.1:8000/assets/${simulation.id}/${endpoint}`,
                 {
                     ticker: asset.symbol,
-                    desired_amount: parsedAmount
+                    desired_amount: amountToSend  // Número com 2 casas decimais
                 }
             );
 
@@ -156,7 +161,7 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
     };
 
     // Calculate step value (price of one share)
-    const stepValue = effectivePrice > 0 ? effectivePrice.toFixed(2) : '0.01';
+    const stepValue = effectivePrice > 0 ? parseFloat(effectivePrice).toFixed(2) : '0.01';
 
     if (!asset) return null;
 
@@ -222,7 +227,7 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess }) {
                                         <div className="d-flex justify-content-between mb-2">
                                             <span className="text-muted">Exchange Rate</span>
                                             <strong className="text-warning">
-                                                1 {assetCurrency} = {conversionRate?.toFixed(4)} {simulationCurrency}
+                                                1 {assetCurrency} = {parseFloat(conversionRate).toFixed(4)} {simulationCurrency}
                                             </strong>
                                         </div>
                                         <div className="d-flex justify-content-between mb-2">
