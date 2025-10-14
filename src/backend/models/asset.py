@@ -29,15 +29,17 @@ class AssetORM(Base):
     start_date = Column(Date, nullable=False)
     simulation_ids = Column(JSON, default=list, nullable=False)
     monthly_data = Column(JSON, default=list, nullable=False)
-    # MONTLY DATA FORMAT
+
+    # MONTHLY DATA FORMAT (ATUALIZADO COM VOLUME)
     # [
     #   {
-    #     "date": "date",
-    #     "open": Decimal(0.01),
-    #     "high": Decimal(0.01),
-    #     "low": Decimal(0.01),
-    #     "close": Decimal(0.01),
-    #     "dividends": Decimal | None,
-    #     "splits": Decimal | None
+    #     "date": "YYYY-MM-DD",
+    #     "open": "Decimal(0.01)",
+    #     "high": "Decimal(0.01)",
+    #     "low": "Decimal(0.01)",
+    #     "close": "Decimal(0.01)",
+    #     "volume": int,              # 🔑 ADICIONADO
+    #     "dividends": "Decimal | None",
+    #     "splits": "Decimal | None"
     #   }
     # ]

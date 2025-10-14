@@ -26,13 +26,13 @@ class MonthlyDataPoint(BaseModel):
     high: Decimal
     low: Decimal
     close: Decimal
+    volume: int = 0  # 🔑 ADICIONA ESSA LINHA AQUI SEU LINDO!
     dividends: Optional[Decimal] = None
     splits: Optional[Decimal] = None
 
 
 class AssetSearchResponse(BaseModel):
     """Response for asset search with historical data."""
-
     ticker: str
     name: str
     base_currency: str

@@ -157,8 +157,8 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess, curr
         }
     };
 
-    // Calculate step value (price of one share)
-    const stepValue = effectivePrice > 0 ? parseFloat(effectivePrice).toFixed(2) : '0.01';
+    // Calculate step value (price of one share) - NÚMERO, não string!
+    const stepValue = effectivePrice > 0 ? parseFloat(effectivePrice) : 0.01;
 
     if (!asset) return null;
 
@@ -256,7 +256,7 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess, curr
                             <Form.Control
                                 type="number"
                                 step={stepValue}
-                                min="0.01"
+                                min="0"
                                 max={isBuying ? simulation.balance : (currentHolding?.market_value || undefined)}
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
@@ -275,8 +275,8 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess, curr
                         </InputGroup>
                         <Form.Text className="text-muted">
                             {isBuying
-                                ? `Use Max to invest all available balance. Arrows increment by ${simSymbol}${stepValue}`
-                                : `Use Max to sell entire position (${currentHolding ? formatCurrency(parseFloat(currentHolding.market_value), simulationCurrency) : 'N/A'}). Arrows increment by ${simSymbol}${stepValue}`
+                                ? `Use Max to invest all available balance. Arrows increment by ${simSymbol}${stepValue.toFixed(2)}`
+                                : `Use Max to sell entire position (${currentHolding ? formatCurrency(parseFloat(currentHolding.market_value), simulationCurrency) : 'N/A'}). Arrows increment by ${simSymbol}${stepValue.toFixed(2)}`
                             }
                         </Form.Text>
                     </Form.Group>

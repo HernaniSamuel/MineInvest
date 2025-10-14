@@ -279,6 +279,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
         cutout: '65%'
     };
 
+
     return (
         <div>
             {/* Top Bar */}

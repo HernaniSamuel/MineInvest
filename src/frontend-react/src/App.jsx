@@ -44,7 +44,16 @@ function App() {
         localStorage.removeItem('lastScreen');
     };
     
-    const goToTrading = () => {
+    const goToTrading = async () => {
+        // 🔑 Recarrega a simulation antes de ir pro trading
+        if (currentSimulation?.id) {
+            try {
+                const response = await simulationsAPI.get(currentSimulation.id);
+                setCurrentSimulation(response.data);
+            } catch (error) {
+                console.error('Failed to reload simulation:', error);
+            }
+        }
         setCurrentScreen('trading');
     };
     

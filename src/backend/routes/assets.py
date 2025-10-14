@@ -79,10 +79,7 @@ async def search_assets(q: str = Query(..., min_length=2, max_length=50)):
 
             # Filter and format results
             quotes = data.get('quotes', [])
-            filtered_quotes = [
-                q for q in quotes
-                if q.get('quoteType') == 'EQUITY'
-            ]
+            filtered_quotes = quotes  # Aceita qualquer tipo
 
             result = {
                 "count": len(filtered_quotes),

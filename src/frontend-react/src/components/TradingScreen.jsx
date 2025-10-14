@@ -3,7 +3,7 @@ import { Container, Row, Col, Button, Form, ListGroup, Spinner, Badge, Alert } f
 import axios from 'axios';
 import { showToast } from '../utils/toast';
 import { formatCurrency } from '../utils/formatters';
-import PriceChart from './PriceChart/PriceChart.jsx';
+import PriceChart from './PriceChart.jsx';
 import TradingModal from './TradingModal';
 
 function TradingScreen({ simulation, onBack }) {

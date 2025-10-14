@@ -87,6 +87,7 @@ def search_asset(
                         high=Decimal(data["high"]),
                         low=Decimal(data["low"]),
                         close=Decimal(data["close"]),
+                        volume=int(data.get("volume") or 0),  # 🔑 CAST para int
                         dividends=Decimal(data["dividends"]) if data.get("dividends") else None,
                         splits=Decimal(data["splits"]) if data.get("splits") else None
                     )
@@ -109,6 +110,7 @@ def search_asset(
                     high=Decimal(data["high"]),
                     low=Decimal(data["low"]),
                     close=Decimal(data["close"]),
+                    volume=int(data.get("volume") or 0),  # 🔑 CAST para int
                     dividends=Decimal(data["dividends"]) if data.get("dividends") else None,
                     splits=Decimal(data["splits"]) if data.get("splits") else None
                 )
@@ -121,7 +123,6 @@ def search_asset(
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
 @router.post("/{simulation_id}/purchase", response_model=SimulationRead)
 def purchase_asset(
         simulation_id: int,

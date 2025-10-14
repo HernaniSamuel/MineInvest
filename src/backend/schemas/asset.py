@@ -25,5 +25,6 @@ class MontlyDataPoint(BaseModel):
     high: Decimal
     low: Decimal
     close: Decimal
+    volume: int = 0  # 🔑 ADICIONADO - default 0 para compatibilidade
     dividends: Optional[Decimal] = None
     splits: Optional[Decimal] = None

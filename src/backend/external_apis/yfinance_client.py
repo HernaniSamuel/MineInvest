@@ -19,6 +19,7 @@ from src.backend.services.asset_cache import AssetData
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
+
 class YFinanceClient:
 
     @staticmethod
@@ -39,27 +40,29 @@ class YFinanceClient:
             if hist.empty:
                 raise ValueError(f"No data available for {ticker}")
 
-            # Resample to monthly
+            # Resample to monthly - ADICIONADO VOLUME!
             hist_monthly = hist.resample('MS').agg({
                 'Open': 'first',
                 'High': 'max',
                 'Low': 'min',
                 'Close': 'last',
+                'Volume': 'sum',  # 🔑 SOMA o volume do mês inteiro
                 'Dividends': 'sum',
                 'Stock Splits': 'prod'
             })
 
             # Forward fill missing months (CRITICAL for gaps)
-            # This propagates last known price forward
-            hist_monthly = hist_monthly.ffill()
+            # Nota: Volume NÃO deve ser forward filled (mantém NaN ou 0)
+            hist_monthly[['Open', 'High', 'Low', 'Close', 'Volume']] = hist_monthly[['Open', 'High', 'Low', 'Close', 'Volume']].ffill()
 
             # Generate complete month range (no gaps)
             start_date = hist_monthly.index[0]
             end_date = hist_monthly.index[-1]
             complete_range = pd.date_range(start=start_date, end=end_date, freq='MS')
 
-            # Reindex with complete range, forward fill any remaining gaps
-            hist_monthly = hist_monthly.reindex(complete_range, method='ffill')
+            # Reindex with complete range
+            hist_monthly = hist_monthly.reindex(complete_range)
+            hist_monthly[['Open', 'High', 'Low', 'Close', 'Volume']] = hist_monthly[['Open', 'High', 'Low', 'Close', 'Volume']].ffill()
 
             # Convert to monthly_data list
             monthly_data = []
@@ -72,6 +75,7 @@ class YFinanceClient:
                     "high": str(Decimal(str(row['High'])).quantize(Decimal('0.01'))),
                     "low": str(Decimal(str(row['Low'])).quantize(Decimal('0.01'))),
                     "close": str(Decimal(str(row['Close'])).quantize(Decimal('0.01'))),
+                    "volume": int(row['Volume']) if pd.notna(row['Volume']) else 0,  # 🔑 VOLUME ADICIONADO
                     "dividends": str(Decimal(str(row['Dividends']))) if pd.notna(row['Dividends']) and row[
                         'Dividends'] > 0 else None,
                     "splits": str(Decimal(str(row['Stock Splits']))) if pd.notna(row['Stock Splits']) and row[

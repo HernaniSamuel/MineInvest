@@ -1,6 +1,7 @@
 // src/components/PriceChart/PriceChart.jsx
+// VERSÃO COMPLETA E FUNCIONAL
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart } from 'lightweight-charts';
 import { Spinner, Alert, ButtonGroup, Button, Form } from 'react-bootstrap';
 
@@ -37,6 +38,22 @@ const calculateEMA = (data, period) => {
 // Subcomponents
 function ChartCrosshair({ data, symbol }) {
     if (!data) return null;
+
+    // Função para formatar volume (1.234.567.890 → 1.23B)
+    const formatVolume = (volume) => {
+        if (!volume || volume === 0) return '0';
+
+        const absVolume = Math.abs(volume);
+        if (absVolume >= 1e9) {
+            return (volume / 1e9).toFixed(2) + 'B';
+        } else if (absVolume >= 1e6) {
+            return (volume / 1e6).toFixed(2) + 'M';
+        } else if (absVolume >= 1e3) {
+            return (volume / 1e3).toFixed(2) + 'K';
+        }
+        return volume.toLocaleString();
+    };
+
     return (
         <div style={{
             position: 'absolute', top: 10, left: 10, zIndex: 1000,
@@ -51,10 +68,18 @@ function ChartCrosshair({ data, symbol }) {
                     H: <span style={{ color: '#10b981' }}>{data.high.toFixed(2)}</span> •{' '}
                     L: <span style={{ color: '#ef4444' }}>{data.low.toFixed(2)}</span> •{' '}
                     C: <span style={{ color: '#d1d5db' }}>{data.close.toFixed(2)}</span>
+                    {data.volume !== undefined && (
+                        <> • Vol: <span style={{ color: '#26a69a' }}>{formatVolume(data.volume)}</span></>
+                    )}
                 </>
             )}
             {data.value && !data.open && (
-                <>Price: <span style={{ color: '#d1d5db' }}>{data.value.toFixed(2)}</span></>
+                <>
+                    Price: <span style={{ color: '#d1d5db' }}>{data.value.toFixed(2)}</span>
+                    {data.volume !== undefined && (
+                        <> • Vol: <span style={{ color: '#26a69a' }}>{formatVolume(data.volume)}</span></>
+                    )}
+                </>
             )}
         </div>
     );
@@ -111,7 +136,7 @@ function ChartControls({ chartType, setChartType, drawingMode, setDrawingMode,
                     <Button variant={drawingMode === 'horizontal' ? 'primary' : 'outline-secondary'}
                         onClick={() => setDrawingMode(drawingMode === 'horizontal' ? null : 'horizontal')}
                         title="Add Support/Resistance Line">
-                        <i className="bi bi-dash-lg"></i> S/R
+                        <i className="bi bi-dash-lg"></i> S/R Line
                     </Button>
                     <Button variant="outline-danger" onClick={onClearDrawings}
                         disabled={drawingsCount === 0} title="Clear All Drawings">
@@ -157,17 +182,18 @@ function PriceChart({ assetData, symbol }) {
     const candleSeriesRef = useRef(null);
     const volumeSeriesRef = useRef(null);
     const indicatorsRef = useRef({});
-    const drawingLinesRef = useRef([]);
+
+    // 🔑 Estado que PERSISTE as linhas entre re-renders
+    const [savedDrawings, setSavedDrawings] = useState([]);
 
     const [error, setError] = useState(null);
     const [chartType, setChartType] = useState('candlestick');
     const [indicators, setIndicators] = useState({
         sma20: false, sma50: false, sma200: false,
-        ema12: false, ema26: false, volume: true,
+        ema12: false, ema26: false, volume: false,
     });
     const [crosshairData, setCrosshairData] = useState(null);
     const [drawingMode, setDrawingMode] = useState(null);
-    const [drawingsCount, setDrawingsCount] = useState(0);
 
     // Format data
     const formatChartData = (data) => {
@@ -228,7 +254,6 @@ function PriceChart({ assetData, symbol }) {
             scaleMargins: { top: 0.7, bottom: 0 },
         });
 
-        // Hide the volume scale to remove the annoying zero line
         chart.priceScale('volume').applyOptions({
             scaleMargins: { top: 0.7, bottom: 0 },
             visible: false,
@@ -282,9 +307,6 @@ function PriceChart({ assetData, symbol }) {
                 });
                 series.setData(sma200);
                 newIndicators.sma200 = series;
-                console.log('✅ SMA 200 added with', sma200.length, 'data points');
-            } else {
-                console.warn('⚠️ SMA 200: Not enough data (need at least 200 periods, have ' + formattedData.length + ')');
             }
         }
 
@@ -313,69 +335,79 @@ function PriceChart({ assetData, symbol }) {
         return newIndicators;
     };
 
-    // Handle chart click for drawings
-    const handleChartClick = (param, mainSeries) => {
+    // 🔑 Função para RESTAURAR linhas após re-render
+    const restoreDrawings = useCallback((mainSeries) => {
+        if (!mainSeries || savedDrawings.length === 0) return;
+
+        console.log('🔄 Restoring', savedDrawings.length, 'drawings');
+
+        savedDrawings.forEach(drawing => {
+            try {
+                if (drawing.type === 'horizontal') {
+                    mainSeries.createPriceLine({
+                        price: drawing.price,
+                        color: drawing.color,
+                        lineWidth: drawing.lineWidth,
+                        lineStyle: drawing.lineStyle,
+                        axisLabelVisible: true,
+                        title: drawing.title,
+                    });
+                    console.log('✅ Restored horizontal line at', drawing.price);
+                }
+                // Linhas verticais não são suportadas nativamente pela biblioteca
+            } catch (err) {
+                console.warn('Failed to restore drawing:', err);
+            }
+        });
+    }, [savedDrawings]);
+
+    // 🔑 Handler de clique - SALVA no estado
+    const handleChartClick = useCallback((param, mainSeries) => {
         if (!drawingMode) return;
 
         if (drawingMode === 'horizontal') {
             let price = null;
 
-            // Try to get price from point coordinate
-            if (param.point && param.point.y) {
-                price = mainSeries.coordinateToPrice(param.point.y);
+            if (param.point?.y) {
+                try {
+                    price = mainSeries.coordinateToPrice(param.point.y);
+                } catch (err) {
+                    console.warn('Failed to get price:', err);
+                }
             }
 
-            // Fallback: get from series data
             if (!price && param.seriesData) {
-                const seriesData = param.seriesData.get(mainSeries);
-                price = seriesData?.close || seriesData?.value;
+                const data = param.seriesData.get(mainSeries);
+                price = data?.close || data?.value;
             }
 
             if (!price || isNaN(price)) {
-                console.warn('❌ Could not determine price for horizontal line');
+                console.error('Could not determine price');
                 return;
             }
 
-            console.log('✅ Adding S/R line at price:', price.toFixed(2));
-
-            const priceLine = mainSeries.createPriceLine({
+            // 🔑 SALVAR no estado
+            const drawing = {
+                type: 'horizontal',
                 price: Number(price),
                 color: '#6366f1',
                 lineWidth: 3,
-                lineStyle: 2, // Dashed
-                axisLabelVisible: true,
+                lineStyle: 2,
                 title: `S/R ${price.toFixed(2)}`,
-            });
+            };
 
-            drawingLinesRef.current.push({
-                type: 'horizontal',
-                line: priceLine,
-                series: mainSeries
-            });
-
-            setDrawingsCount(drawingLinesRef.current.length);
+            setSavedDrawings(prev => [...prev, drawing]);
             setDrawingMode(null);
+            console.log('✅ S/R line saved at:', price.toFixed(2));
         }
-    };
+    }, [drawingMode]);
 
-    // Clear drawings
-    const clearAllDrawings = () => {
-        if (!chartRef.current) return;
-
-        drawingLinesRef.current.forEach(({ type, line, series }) => {
-            try {
-                if (type === 'horizontal' && series) {
-                    series.removePriceLine(line);
-                }
-            } catch (err) {
-                console.warn('Failed to remove drawing:', err);
-            }
-        });
-        drawingLinesRef.current = [];
-        setDrawingsCount(0);
+    // 🔑 Limpar linhas
+    const clearAllDrawings = useCallback(() => {
+        setSavedDrawings([]);
         setDrawingMode(null);
         console.log('✅ All drawings cleared');
-    };
+    }, []);
 
     // Toggle indicator
     const toggleIndicator = (indicator) => {
@@ -451,8 +483,6 @@ function PriceChart({ assetData, symbol }) {
                 return;
             }
 
-            console.log('📊 Chart data:', formattedData.length, 'periods');
-
             // Add main series
             const mainSeries = createMainSeries(chart);
             candleSeriesRef.current = mainSeries;
@@ -482,6 +512,9 @@ function PriceChart({ assetData, symbol }) {
             // Add new indicators
             indicatorsRef.current = addIndicators(chart, formattedData);
 
+            // 🔑 RESTAURAR as linhas salvas
+            restoreDrawings(mainSeries);
+
             // Crosshair handler
             chart.subscribeCrosshairMove((param) => {
                 if (!param.time || !param.seriesData || param.seriesData.size === 0) {
@@ -491,7 +524,16 @@ function PriceChart({ assetData, symbol }) {
 
                 const data = param.seriesData.get(mainSeries);
                 if (data) {
-                    setCrosshairData({ time: param.time, price: param.point?.y, ...data });
+                    // Encontrar o volume correspondente no formattedData
+                    const matchingData = formattedData.find(d => d.time === param.time);
+                    const volume = matchingData?.volume;
+
+                    setCrosshairData({
+                        time: param.time,
+                        price: param.point?.y,
+                        volume: volume,
+                        ...data
+                    });
                 }
             });
 
@@ -516,17 +558,6 @@ function PriceChart({ assetData, symbol }) {
             return () => {
                 window.removeEventListener('resize', handleResize);
                 if (chartRef.current) {
-                    // Clear drawings before removing chart
-                    drawingLinesRef.current.forEach(({ type, line, series }) => {
-                        try {
-                            if (type === 'horizontal' && series) {
-                                series.removePriceLine(line);
-                            }
-                        } catch (err) {
-                            console.warn('Failed to remove drawing line:', err);
-                        }
-                    });
-                    drawingLinesRef.current = [];
                     chartRef.current.remove();
                     chartRef.current = null;
                 }
@@ -537,7 +568,7 @@ function PriceChart({ assetData, symbol }) {
             setError(`Chart error: ${err.message}`);
         }
 
-    }, [assetData, symbol, chartType, indicators, drawingMode]);
+    }, [assetData, symbol, chartType, indicators, handleChartClick, restoreDrawings]);
 
     // Error state
     if (error) {
@@ -578,7 +609,7 @@ function PriceChart({ assetData, symbol }) {
                 setChartType={setChartType}
                 drawingMode={drawingMode}
                 setDrawingMode={setDrawingMode}
-                drawingsCount={drawingsCount}
+                drawingsCount={savedDrawings.length}
                 onClearDrawings={clearAllDrawings}
                 indicators={indicators}
                 onToggleIndicator={toggleIndicator}
