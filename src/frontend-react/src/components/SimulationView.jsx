@@ -49,6 +49,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
     const [canUndo, setCanUndo] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [selectedTicker, setSelectedTicker] = useState(null);
+    const [snapshotInfo, setSnapshotInfo] = useState(null);
 
     useEffect(() => {
         loadAllData();
@@ -97,9 +98,11 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
             try {
                 const snapshotResponse = await snapshotAPI.get(simulationId);
                 setCanUndo(snapshotResponse.data.can_restore || false);
+                setSnapshotInfo(snapshotResponse.data);
             } catch (err) {
                 console.error('Snapshot check error:', err);
                 setCanUndo(false);
+                setSnapshotInfo(null);
             }
 
         } catch (error) {
@@ -111,7 +114,6 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
     };
 
     const handleGoToTradingWithTicker = (ticker = null) => {
-        // Passa o ticker para o componente pai
         onGoToTrading(ticker);
     };
 
@@ -161,18 +163,38 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
     };
 
     const handleUndoMonth = async () => {
-        if (!window.confirm('⚠️ UNDO CURRENT MONTH?\n\nThis will:\n• Restore balance to start of month\n• Restore holdings to start of month\n• Delete all operations (except dividends)\n\nContinue?')) {
+        const snapshotDate = snapshotInfo?.month_date ? formatDate(snapshotInfo.month_date) : 'snapshot';
+
+        if (!window.confirm(`⚠️ RESTORE TO CHECKPOINT?\n\nThis will restore to: ${snapshotDate}\n\n• Revert balance to checkpoint\n• Restore holdings from checkpoint\n• Delete all operations made after checkpoint\n\n⚠️ This cannot be undone!\n\nContinue?`)) {
             return;
         }
 
         try {
             setLoading(true);
             await snapshotAPI.restore(simulationId);
-            showToast.success('Month undone successfully!');
+            showToast.success(`Restored to checkpoint: ${snapshotDate}`);
             await loadAllData();
         } catch (error) {
-            console.error('Failed to undo month:', error);
-            showToast.error('Failed to undo: ' + error.message);
+            console.error('Failed to restore checkpoint:', error);
+            showToast.error('Failed to restore: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCreateCheckpoint = async () => {
+        if (!window.confirm('💾 CREATE CHECKPOINT?\n\nThis will save your current:\n• Balance\n• Holdings\n• Asset prices\n\nYou can restore to this point later.\n\nContinue?')) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+            await snapshotAPI.create(simulationId);
+            showToast.success('Checkpoint created successfully!');
+            await loadAllData();
+        } catch (error) {
+            console.error('Failed to create checkpoint:', error);
+            showToast.error('Failed to create checkpoint: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -394,18 +416,35 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                     <div className="fs-4 fw-bold text-primary" style={{ fontFamily: 'monospace' }}>
                                         {formatCurrentDate(simulation.current_date)}
                                     </div>
+                                    {snapshotInfo?.exists && (
+                                        <div className="mt-1">
+                                            <Badge bg="success" className="d-flex align-items-center gap-1" style={{ fontSize: '0.7rem' }}>
+                                                <i className="bi bi-save"></i>
+                                                Checkpoint: {formatCurrentDate(snapshotInfo.month_date)}
+                                            </Badge>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </Col>
                         <Col xs="auto" className="d-flex gap-2">
                             <Button
+                                variant="outline-info"
+                                onClick={handleCreateCheckpoint}
+                                disabled={loading}
+                                title="Save current state"
+                            >
+                                <i className="bi bi-save me-1"></i>
+                                Save Checkpoint
+                            </Button>
+                            <Button
                                 variant="outline-warning"
                                 onClick={handleUndoMonth}
                                 disabled={!canUndo || loading}
-                                title="Undo current month"
+                                title={canUndo ? `Restore to checkpoint: ${snapshotInfo?.month_date ? formatDate(snapshotInfo.month_date) : ''}` : 'No checkpoint available'}
                             >
                                 <i className="bi bi-arrow-counterclockwise me-1"></i>
-                                Undo
+                                Restore
                             </Button>
                             <Button
                                 variant="success"
@@ -582,7 +621,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                                 <td>
                                                     <Button
                                                         variant="link"
-                                                        className="p-0 fw-bold text-decoration-none"
+                                                        className="p-0 text-decoration-none"
                                                         onClick={() => handleGoToTradingWithTicker(holding.ticker)}
                                                         style={{
                                                             fontSize: 'inherit',
@@ -590,7 +629,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                                             textDecoration: 'none'
                                                         }}
                                                     >
-                                                        {holding.ticker}
+                                                        {holding.name}
                                                         <i className="bi bi-box-arrow-up-right ms-1 small"></i>
                                                     </Button>
                                                 </td>
@@ -602,7 +641,6 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                                     <br />
                                                     <small>({formatPercent(holdingGainLossPercent)})</small>
                                                 </td>
-
                                             </tr>
                                         );
                                     })
@@ -619,8 +657,8 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                             <i className="bi bi-clock-history me-2"></i>
                             Transaction History
                         </h5>
-                        <Button 
-                            size="sm" 
+                        <Button
+                            size="sm"
                             variant="outline-secondary"
                             onClick={() => setShowHistory(!showHistory)}
                         >
@@ -634,7 +672,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                 <p className="text-muted text-center py-3">No transaction history yet.</p>
                             ) : (
                                 [...history.months].reverse().map(month => (
-                                    <div 
+                                    <div
                                         key={month.month_date}
                                         className="mb-3 p-3"
                                         style={{
@@ -651,7 +689,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                             <p className="text-muted small mb-0">No operations this month</p>
                                         ) : (
                                             month.operations.map((op, idx) => (
-                                                <div 
+                                                <div
                                                     key={idx}
                                                     className="py-1 px-2 mb-1"
                                                     style={{

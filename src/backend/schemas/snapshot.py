@@ -15,13 +15,13 @@
 
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
-
+from decimal import Decimal
 
 class SnapshotInfo(BaseModel):
     """Information about the current snapshot."""
     exists: bool
     month_date: Optional[str] = None
-    balance: Optional[str] = None
+    balance: Optional[Decimal] = None
     holdings_count: Optional[int] = None
     can_restore: Optional[bool] = None
 
@@ -43,5 +43,5 @@ class RestoreResponse(BaseModel):
     success: bool
     message: str
     simulation_id: int
-    restored_balance: str
+    restored_balance: Decimal
     restored_holdings_count: int

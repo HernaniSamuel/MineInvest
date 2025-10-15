@@ -48,8 +48,8 @@ export const timeAPI = {
 };
 
 export const snapshotAPI = {
-    get: (simId) => api.get(`/simulations/${simId}/snapshot`),
-    restore: (simId) => api.post(`/simulations/${simId}/restore`)
+    create: (simulationId) => api.post(`/simulations/${simulationId}/snapshot`),
+    restore: (simulationId) => api.post(`/simulations/${simulationId}/restore`),
+    get: (simulationId) => api.get(`/simulations/${simulationId}/snapshot`)
 };
-
 export default api;
