@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Container, Row, Col, Button, Spinner, Alert, Table, Card } from 'react-bootstrap';
-import { 
-    simulationsAPI, 
-    portfolioAPI, 
-    historyAPI, 
+import { Container, Row, Col, Button, Spinner, Alert, Table, Badge } from 'react-bootstrap';
+import {
+    simulationsAPI,
+    portfolioAPI,
+    historyAPI,
     holdingsAPI,
     timeAPI,
-    snapshotAPI 
+    snapshotAPI
 } from '../services/api';
 import { formatCurrency, formatDate, formatPercent } from '../utils/formatters';
 import BalanceModal from './BalanceModal';
@@ -26,7 +26,6 @@ import {
 } from 'chart.js';
 import { showToast } from '../utils/toast';
 
-// Register ChartJS components
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -49,6 +48,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
     const [canAdvance, setCanAdvance] = useState(false);
     const [canUndo, setCanUndo] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+    const [selectedTicker, setSelectedTicker] = useState(null);
 
     useEffect(() => {
         loadAllData();
@@ -58,11 +58,9 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
         try {
             setLoading(true);
 
-            // Load simulation
             const simResponse = await simulationsAPI.get(simulationId);
             setSimulation(simResponse.data);
 
-            // Load portfolio
             try {
                 const portfolioResponse = await portfolioAPI.get(simulationId);
                 setPortfolio(portfolioResponse.data);
@@ -80,7 +78,6 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                 });
             }
 
-            // Load history
             try {
                 const historyResponse = await historyAPI.get(simulationId);
                 setHistory(historyResponse.data);
@@ -89,7 +86,6 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                 setHistory({ months: [] });
             }
 
-            // Check if can advance
             try {
                 const canAdvanceResponse = await timeAPI.canAdvance(simulationId);
                 setCanAdvance(canAdvanceResponse.data.can_advance);
@@ -98,7 +94,6 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                 setCanAdvance(false);
             }
 
-            // Check if can undo
             try {
                 const snapshotResponse = await snapshotAPI.get(simulationId);
                 setCanUndo(snapshotResponse.data.can_restore || false);
@@ -115,11 +110,13 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
         }
     };
 
+    const handleGoToTradingWithTicker = (ticker = null) => {
+        // Passa o ticker para o componente pai
+        onGoToTrading(ticker);
+    };
+
     const handleBalanceSuccess = (updatedSimulation) => {
-        // Update simulation state with new balance
         setSimulation(updatedSimulation);
-        
-        // Reload charts and history
         loadAllData();
     };
 
@@ -145,16 +142,15 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
         try {
             setLoading(true);
             const response = await timeAPI.advance(simulationId);
-            
+
             const report = response.data;
-            
-            // Show success toast with summary
+
             let message = `Advanced to ${formatDate(report.new_date)}`;
             if (report.total_dividends > 0) {
                 message += ` • Dividends: ${formatCurrency(report.total_dividends)}`;
             }
             showToast.success(message);
-            
+
             await loadAllData();
         } catch (error) {
             console.error('Failed to advance month:', error);
@@ -187,6 +183,14 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
         setShowBalanceModal(true);
     };
 
+    // Format current date as MM/YYYY
+    const formatCurrentDate = (dateString) => {
+        const date = new Date(dateString);
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${month}/${year}`;
+    };
+
     if (loading && !simulation) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
@@ -209,27 +213,37 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
     const gainLoss = parseFloat(portfolio.summary.total_gain_loss);
     const gainLossPercent = parseFloat(portfolio.summary.gain_loss_percentage);
 
+    // Calculate percentage changes from initial value
+    const calculatePercentageData = () => {
+        if (!history?.months || history.months.length === 0) {
+            return [0];
+        }
+
+        const initialValue = parseFloat(history.months[0].total);
+
+        return history.months.map(m => {
+            const currentValue = parseFloat(m.total);
+            const percentChange = ((currentValue - initialValue) / initialValue) * 100;
+            return percentChange;
+        });
+    };
+
+    const percentageData = calculatePercentageData();
+    const absoluteData = history?.months?.map(m => parseFloat(m.total)) || [totalValue];
+
     // Prepare chart data
     const lineChartData = {
         labels: history?.months?.map(m => formatDate(m.month_date)) || [formatDate(simulation.current_date)],
         datasets: [
             {
-                label: 'Total Value',
-                data: history?.months?.map(m => parseFloat(m.total)) || [balance],
+                label: 'Portfolio Growth',
+                data: percentageData,
                 borderColor: '#3b82f6',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 borderWidth: 3,
                 fill: true,
-                tension: 0.4
-            },
-            {
-                label: 'Cash',
-                data: history?.months?.map(m => parseFloat(m.total)) || [balance],
-                borderColor: '#f59e0b',
-                backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
+                tension: 0.4,
+                yAxisID: 'y'
             }
         ]
     };
@@ -237,18 +251,61 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
     const lineChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
         plugins: {
             legend: {
                 display: true,
                 position: 'bottom',
                 labels: { color: '#d1d5db' }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                titleColor: '#f3f4f6',
+                bodyColor: '#d1d5db',
+                borderColor: '#374151',
+                borderWidth: 1,
+                padding: 12,
+                displayColors: true,
+                callbacks: {
+                    title: (context) => {
+                        return context[0].label;
+                    },
+                    label: (context) => {
+                        const index = context.dataIndex;
+                        const percentChange = context.parsed.y;
+                        const absoluteValue = absoluteData[index] || 0;
+
+                        return [
+                            `Growth: ${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(2)}%`,
+                            `Value: ${formatCurrency(absoluteValue, simulation.base_currency)}`
+                        ];
+                    }
+                }
             }
         },
         scales: {
             y: {
                 beginAtZero: true,
+                position: 'left',
                 grid: { color: '#374151' },
-                ticks: { color: '#9ca3af' }
+                ticks: {
+                    color: '#9ca3af',
+                    callback: function(value) {
+                        return value.toFixed(1) + '%';
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Growth (%)',
+                    color: '#9ca3af',
+                    font: {
+                        size: 12,
+                        weight: 'bold'
+                    }
+                }
             },
             x: {
                 grid: { display: false },
@@ -274,17 +331,38 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
             legend: {
                 position: 'bottom',
                 labels: { color: '#d1d5db' }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                titleColor: '#f3f4f6',
+                bodyColor: '#d1d5db',
+                borderColor: '#374151',
+                borderWidth: 1,
+                padding: 12,
+                callbacks: {
+                    label: (context) => {
+                        const label = context.label || '';
+                        const value = context.parsed || 0;
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((value / total) * 100).toFixed(2);
+
+                        return [
+                            `${label}`,
+                            `Value: ${formatCurrency(value, simulation.base_currency)}`,
+                            `Weight: ${percentage}%`
+                        ];
+                    }
+                }
             }
         },
         cutout: '65%'
     };
 
-
     return (
         <div>
             {/* Top Bar */}
-            <div style={{ 
-                backgroundColor: 'var(--bg-secondary)', 
+            <div style={{
+                backgroundColor: 'var(--bg-secondary)',
                 borderBottom: '1px solid var(--border-color)',
                 position: 'sticky',
                 top: 0,
@@ -299,31 +377,52 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                             </Button>
                         </Col>
                         <Col>
-                            <h3 className="mb-0 fw-bold">{simulation.name}</h3>
-                            <small className="text-muted">
-                                {simulation.base_currency} • Started {formatDate(simulation.start_date)} • Current: {formatDate(simulation.current_date)}
-                            </small>
+                            <div className="d-flex align-items-center gap-3">
+                                <div>
+                                    <h3 className="mb-0 fw-bold">{simulation.name}</h3>
+                                    <small className="text-muted">
+                                        Started {formatDate(simulation.start_date)} • {simulation.base_currency}
+                                    </small>
+                                </div>
+                                <div style={{
+                                    padding: '0.5rem 1rem',
+                                    backgroundColor: 'var(--bg-tertiary)',
+                                    borderRadius: '0.5rem',
+                                    border: '2px solid var(--border-color)'
+                                }}>
+                                    <div className="text-muted small mb-1">Current Date</div>
+                                    <div className="fs-4 fw-bold text-primary" style={{ fontFamily: 'monospace' }}>
+                                        {formatCurrentDate(simulation.current_date)}
+                                    </div>
+                                </div>
+                            </div>
                         </Col>
                         <Col xs="auto" className="d-flex gap-2">
-                            <Button 
-                                variant="outline-warning" 
+                            <Button
+                                variant="outline-warning"
                                 onClick={handleUndoMonth}
                                 disabled={!canUndo || loading}
                                 title="Undo current month"
                             >
-                                <i className="bi bi-arrow-counterclockwise"></i>
+                                <i className="bi bi-arrow-counterclockwise me-1"></i>
+                                Undo
                             </Button>
-                            <Button 
+                            <Button
+                                variant="success"
+                                onClick={() => handleGoToTradingWithTicker(null)}
+                                size="lg"
+                            >
+                                <i className="bi bi-arrow-left-right me-2"></i>
+                                Trade Assets
+                            </Button>
+                            <Button
                                 variant="primary"
                                 onClick={handleAdvanceMonth}
                                 disabled={!canAdvance || loading}
+                                size="lg"
                             >
                                 <i className="bi bi-skip-forward me-2"></i>
                                 Advance Month
-                            </Button>
-                            <Button variant="success" onClick={onGoToTrading}>
-                                <i className="bi bi-arrow-left-right me-2"></i>
-                                Trade Assets
                             </Button>
                         </Col>
                     </Row>
@@ -342,15 +441,15 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                             value={formatCurrency(balance, simulation.base_currency)}
                             actions={
                                 <>
-                                    <Button 
-                                        size="sm" 
+                                    <Button
+                                        size="sm"
                                         variant="outline-success"
                                         onClick={() => openBalanceModal('add')}
                                     >
                                         <i className="bi bi-plus-circle"></i> Add
                                     </Button>
-                                    <Button 
-                                        size="sm" 
+                                    <Button
+                                        size="sm"
                                         variant="outline-danger"
                                         onClick={() => openBalanceModal('remove')}
                                         className="ms-2"
@@ -398,7 +497,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                             <div className="chart-header d-flex justify-content-between align-items-center">
                                 <h5 className="mb-0">
                                     <i className="bi bi-graph-up me-2"></i>
-                                    Portfolio Value Over Time
+                                    Portfolio Performance
                                 </h5>
                                 <Button size="sm" variant="outline-secondary" onClick={loadAllData}>
                                     <i className="bi bi-arrow-clockwise"></i>
@@ -438,8 +537,8 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                             <i className="bi bi-list-ul me-2"></i>
                             Current Holdings
                         </h5>
-                        <Button 
-                            size="sm" 
+                        <Button
+                            size="sm"
                             variant="outline-primary"
                             onClick={handleRefreshHoldings}
                             disabled={loading}
@@ -454,17 +553,15 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                     <th>Ticker</th>
                                     <th>Name</th>
                                     <th className="text-end">Quantity</th>
-                                    <th className="text-end">Avg. Buy Price</th>
                                     <th className="text-end">Current Price</th>
                                     <th className="text-end">Market Value</th>
-                                    <th className="text-end">Weight</th>
                                     <th className="text-end">Gain/Loss</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {portfolio.holdings.length === 0 ? (
                                     <tr>
-                                        <td colSpan="8" className="text-center text-muted py-4">
+                                        <td colSpan="6" className="text-center text-muted py-4">
                                             <i className="bi bi-inbox display-4 mb-2 d-block"></i>
                                             No holdings yet. Click "Trade Assets" to start investing!
                                         </td>
@@ -475,7 +572,6 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                         const purchasePrice = parseFloat(holding.purchase_price);
                                         const currentPrice = parseFloat(holding.current_price);
                                         const marketValue = parseFloat(holding.market_value);
-                                        const weight = parseFloat(holding.weight);
                                         const invested = quantity * purchasePrice;
                                         const holdingGainLoss = marketValue - invested;
                                         const holdingGainLossPercent = (holdingGainLoss / invested) * 100;
@@ -483,17 +579,30 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                         return (
                                             <tr key={holding.ticker}>
                                                 <td className="fw-bold">{holding.ticker}</td>
-                                                <td>{holding.name}</td>
+                                                <td>
+                                                    <Button
+                                                        variant="link"
+                                                        className="p-0 fw-bold text-decoration-none"
+                                                        onClick={() => handleGoToTradingWithTicker(holding.ticker)}
+                                                        style={{
+                                                            fontSize: 'inherit',
+                                                            color: '#3b82f6',
+                                                            textDecoration: 'none'
+                                                        }}
+                                                    >
+                                                        {holding.ticker}
+                                                        <i className="bi bi-box-arrow-up-right ms-1 small"></i>
+                                                    </Button>
+                                                </td>
                                                 <td className="text-end font-monospace">{quantity.toFixed(4)}</td>
-                                                <td className="text-end font-monospace">{formatCurrency(purchasePrice, holding.base_currency)}</td>
                                                 <td className="text-end font-monospace">{formatCurrency(currentPrice, holding.base_currency)}</td>
                                                 <td className="text-end font-monospace fw-bold">{formatCurrency(marketValue, holding.base_currency)}</td>
-                                                <td className="text-end font-monospace">{weight.toFixed(2)}%</td>
                                                 <td className={`text-end font-monospace ${holdingGainLoss >= 0 ? 'gain' : 'loss'}`}>
                                                     {formatCurrency(holdingGainLoss, holding.base_currency)}
                                                     <br />
                                                     <small>({formatPercent(holdingGainLossPercent)})</small>
                                                 </td>
+
                                             </tr>
                                         );
                                     })

@@ -8,12 +8,13 @@ import { simulationsAPI } from './services/api';
 function App() {
     const [currentScreen, setCurrentScreen] = useState('list');
     const [currentSimulation, setCurrentSimulation] = useState(null);
+    const [selectedTicker, setSelectedTicker] = useState(null);  // 👈 ADICIONAR
     const [loading, setLoading] = useState(false);
-    
+
     useEffect(() => {
         const savedSimId = localStorage.getItem('currentSimulationId');
         const savedScreen = localStorage.getItem('lastScreen');
-        
+
         if (savedSimId && savedScreen === 'view') {
             setLoading(true);
             simulationsAPI.get(savedSimId)
@@ -29,23 +30,23 @@ function App() {
                 .finally(() => setLoading(false));
         }
     }, []);
-    
+
     const openSimulation = (simulation) => {
         setCurrentSimulation(simulation);
         setCurrentScreen('view');
         localStorage.setItem('currentSimulationId', simulation.id);
         localStorage.setItem('lastScreen', 'view');
     };
-    
+
     const goToList = () => {
         setCurrentSimulation(null);
         setCurrentScreen('list');
         localStorage.removeItem('currentSimulationId');
         localStorage.removeItem('lastScreen');
     };
-    
-    const goToTrading = async () => {
-        // 🔑 Recarrega a simulation antes de ir pro trading
+
+    const goToTrading = async (ticker = null) => {  // 👈 MODIFICAR para aceitar ticker
+        // 🔒 Recarrega a simulation antes de ir pro trading
         if (currentSimulation?.id) {
             try {
                 const response = await simulationsAPI.get(currentSimulation.id);
@@ -54,9 +55,10 @@ function App() {
                 console.error('Failed to reload simulation:', error);
             }
         }
+        setSelectedTicker(ticker);  // 👈 ADICIONAR
         setCurrentScreen('trading');
     };
-    
+
     if (loading) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
@@ -66,13 +68,13 @@ function App() {
             </div>
         );
     }
-    
+
     return (
         <div className="app">
             {currentScreen === 'list' && (
                 <SimulationList onOpenSimulation={openSimulation} />
             )}
-            
+
             {currentScreen === 'view' && currentSimulation && (
                 <SimulationView
                     simulationId={currentSimulation.id}
@@ -80,15 +82,16 @@ function App() {
                     onGoToTrading={goToTrading}
                 />
             )}
-            
+
             {currentScreen === 'trading' && currentSimulation && (
                 <TradingScreen
                     simulation={currentSimulation}
                     onBack={() => setCurrentScreen('view')}
+                    initialTicker={selectedTicker}  // 👈 ADICIONAR
                 />
             )}
-            
-            {/* Toast Container - ADD THIS */}
+
+            {/* Toast Container */}
             <ToastContainer
                 position="bottom-right"
                 autoClose={3000}

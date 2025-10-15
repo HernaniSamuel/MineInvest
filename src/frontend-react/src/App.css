@@ -273,3 +273,49 @@ small {
 .list-group {
     scrollbar-width: thin;
 }
+
+/* Adicione isso no final do seu App.css */
+
+/* Custom Scrollbar - Dark Theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-elevated) var(--bg-secondary);
+}
+
+/* Para navegadores Webkit (Chrome, Safari, Edge) */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 5px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: 5px;
+  border: 2px solid var(--bg-secondary);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-color);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: #4b5563;
+}
+
+/* Scrollbar para áreas específicas com hover */
+.table-responsive::-webkit-scrollbar-thumb,
+.overflow-auto::-webkit-scrollbar-thumb,
+[style*="overflow"]::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover,
+.overflow-auto::-webkit-scrollbar-thumb:hover,
+[style*="overflow"]::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}

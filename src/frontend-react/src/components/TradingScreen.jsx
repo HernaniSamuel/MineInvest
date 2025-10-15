@@ -6,7 +6,7 @@ import { formatCurrency } from '../utils/formatters';
 import PriceChart from './PriceChart.jsx';
 import TradingModal from './TradingModal';
 
-function TradingScreen({ simulation, onBack }) {
+function TradingScreen({ simulation, onBack, initialTicker = null }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [searching, setSearching] = useState(false);
@@ -27,6 +27,7 @@ function TradingScreen({ simulation, onBack }) {
 
     const searchTimeoutRef = useRef(null);
     const searchInputRef = useRef(null);
+    const hasAutoLoaded = useRef(false);
 
     // Update local simulation when prop changes
     useEffect(() => {
@@ -40,6 +41,19 @@ function TradingScreen({ simulation, onBack }) {
         }
     }, [currentSimulation?.id]);
 
+    // Auto-load asset if initialTicker is provided
+    useEffect(() => {
+        if (initialTicker && !hasAutoLoaded.current) {
+            hasAutoLoaded.current = true;
+            console.log('Auto-loading ticker:', initialTicker);
+
+            // Set search query to the ticker
+            setSearchQuery(initialTicker);
+
+            // Load the asset directly
+            loadAssetDirectly(initialTicker);
+        }
+    }, [initialTicker]);
     // Update current holding when selected asset or holdings change
     useEffect(() => {
         if (selectedAsset && holdings.length > 0) {
@@ -62,6 +76,51 @@ function TradingScreen({ simulation, onBack }) {
         } catch (error) {
             console.error('Failed to fetch holdings:', error);
             setHoldings([]);
+        }
+    };
+
+    const loadAssetDirectly = async (ticker) => {
+        console.log('Loading asset directly:', ticker);
+
+        setLoading(true);
+        setSelectedAsset(null);
+
+        try {
+            const response = await axios.get(
+                `http://127.0.0.1:8000/assets/${ticker}`,
+                {
+                    params: {
+                        simulation_id: currentSimulation.id
+                    }
+                }
+            );
+
+            console.log('Asset data from backend:', response.data);
+
+            const assetData = {
+                symbol: ticker,
+                shortname: response.data.name || ticker,
+                longname: response.data.name || ticker,
+                apiData: response.data
+            };
+
+            setSelectedAsset(assetData);
+            showToast.success(`Loaded ${assetData.shortname}`);
+
+        } catch (error) {
+            console.error('Asset check error:', error);
+
+            if (error.response?.status === 404) {
+                showToast.error(`${ticker} not found in database or doesn't exist at simulation date`);
+            } else if (error.response?.status === 400) {
+                showToast.error(error.response.data.detail || 'Asset not available at this date');
+            } else {
+                showToast.error('Failed to load asset data');
+            }
+
+            setSelectedAsset(null);
+        } finally {
+            setLoading(false);
         }
     };
 
