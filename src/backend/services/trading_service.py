@@ -50,30 +50,13 @@ def purchase_asset_service(
     4. Calculates quantity of shares to purchase
     5. Validates sufficient balance
     6. Deducts amount from balance via handle_balance_service
-    7. Creates or updates holding (preserves initial purchase price)
+    7. **PERSISTS ASSET TO DATABASE** (NEW!)
+    8. Creates or updates holding (preserves initial purchase price)
 
     Currency Conversion:
         If the asset's currency differs from the simulation's base currency,
         the service automatically fetches the exchange rate for the simulation's
         current date and converts the asset price accordingly.
-
-    Example:
-        >>> # Simulation in BRL, buying AAPL (priced in USD)
-        >>> result = purchase_asset_service(
-        ...     db=session,
-        ...     simulation_id=1,
-        ...     request=PurchaseRequest(
-        ...         ticker='AAPL',
-        ...         desired_amount=5000.00  # BRL
-        ...     )
-        ... )
-        >>> # Service will:
-        >>> # 1. Get AAPL price in USD (e.g., $180.50)
-        >>> # 2. Get USD/BRL rate (e.g., 4.87)
-        >>> # 3. Convert: 180.50 * 4.87 = 879.04 BRL per share
-        >>> # 4. Calculate shares: 5000 / 879.04 = 5.6875 shares
-        >>> # 5. Deduct 5000 BRL from balance via handle_balance_service
-        >>> # 6. Add 5.6875 shares to holdings
 
     Args:
         db: Database session for transactions
@@ -88,10 +71,6 @@ def purchase_asset_service(
         AssetNotFoundError: If asset doesn't exist or not available at date
         PriceUnavailableError: If no price data for asset at simulation date
         InsufficientFundsError: If desired amount exceeds available balance
-
-    Note:
-        The desired_amount is always in the simulation's base currency,
-        regardless of the asset's native currency.
     """
     logger.info(
         f"Purchase request: simulation_id={simulation_id}, "
@@ -182,6 +161,11 @@ def purchase_asset_service(
     simulation = handle_balance_service(db, simulation_id, balance_operation)
     logger.info(f"Balance after purchase: {simulation.balance} {simulation_currency}")
 
+    # 🔥 CRITICAL FIX: Persist asset to database BEFORE creating holding
+    logger.info(f"💾 Persisting asset {request.ticker} to database...")
+    AssetService.persist_to_database(db, asset, simulation_id)
+    logger.info(f"✅ Asset {request.ticker} saved to database")
+
     # Create or update holding
     holding = db.query(HoldingORM).filter(
         HoldingORM.simulation_id == simulation_id,
@@ -204,7 +188,6 @@ def purchase_asset_service(
         holding.quantity = str(new_quantity)
         holding.current_price = str(converted_price)
         holding.market_value = str(market_value)
-        # weight will be recalculated elsewhere if needed
     else:
         # Create new holding with initial purchase price
         market_value = quantity * converted_price
@@ -219,7 +202,7 @@ def purchase_asset_service(
             name=asset.name,
             base_currency=asset.base_currency,
             quantity=str(quantity),
-            purchase_price=str(converted_price),  # Stores first purchase price
+            purchase_price=str(converted_price),
             weight=str(weight),
             current_price=str(converted_price),
             market_value=str(market_value)
@@ -255,29 +238,7 @@ def sell_asset_service(
     5. Validates sufficient position
     6. Adds proceeds to balance via handle_balance_service
     7. Updates or removes holding
-
-    Currency Conversion:
-        Like purchases, sales automatically handle currency conversion when
-        the asset's currency differs from the simulation's base currency.
-
-    Example:
-        >>> # Simulation in BRL, selling AAPL (priced in USD)
-        >>> result = sell_asset_service(
-        ...     db=session,
-        ...     simulation_id=1,
-        ...     request=SellRequest(
-        ...         ticker='AAPL',
-        ...         desired_amount=3000.00  # BRL worth to sell
-        ...     )
-        ... )
-        >>> # Service will:
-        >>> # 1. Get AAPL price in USD (e.g., $185.75)
-        >>> # 2. Get USD/BRL rate (e.g., 4.92)
-        >>> # 3. Convert: 185.75 * 4.92 = 913.89 BRL per share
-        >>> # 4. Calculate shares to sell: 3000 / 913.89 = 3.2826 shares
-        >>> # 5. Validate position has at least 3.2826 shares
-        >>> # 6. Add 3000 BRL to balance via handle_balance_service
-        >>> # 7. Reduce position by 3.2826 shares
+    8. **REMOVES ASSET FROM DATABASE IF ORPHANED** (handles cleanup)
 
     Args:
         db: Database session for transactions
@@ -295,7 +256,8 @@ def sell_asset_service(
 
     Note:
         If the sale reduces the position to near-zero (< 0.000001 shares),
-        the holding is automatically removed from the database.
+        the holding is automatically removed. If no other simulations own this
+        asset, it's also removed from the database.
     """
     logger.info(
         f"Sell request: simulation_id={simulation_id}, "
@@ -351,7 +313,6 @@ def sell_asset_service(
     if asset_currency != simulation_currency:
         logger.info(f"Currency conversion required: {asset_currency} → {simulation_currency}")
 
-        # Fetch exchange rate from service
         exchange_response = ExchangeService.get_exchange_rate(
             db=db,
             from_currency=asset_currency,
@@ -382,8 +343,6 @@ def sell_asset_service(
 
     # Validate sufficient position
     holding_quantity = Decimal(str(holding.quantity))
-
-    # Calculate the maximum sellable amount in currency
     max_sellable_amount = holding_quantity * converted_price
 
     # If trying to sell more than we have OR within 1% of total position, sell EVERYTHING
@@ -391,7 +350,6 @@ def sell_asset_service(
     percentage_diff = abs(difference_amount / max_sellable_amount) if max_sellable_amount > 0 else Decimal('0')
 
     if quantity_to_sell > holding_quantity:
-        # If difference is less than 1% OR less than 0.01 in currency, sell everything
         if percentage_diff < Decimal("0.01") or abs(difference_amount) < Decimal("0.01"):
             logger.info(
                 f"Selling entire position: requested {desired_amount}, "
@@ -399,12 +357,12 @@ def sell_asset_service(
             )
             quantity_to_sell = holding_quantity
         else:
-            # Actually insufficient - reject it
             raise InsufficientPositionError(
                 f"Insufficient position. You own {holding_quantity} shares. "
                 f"At current price of {converted_price} {simulation_currency}, "
                 f"you can sell up to {max_sellable_amount:.2f} {simulation_currency}"
             )
+
     # Add proceeds to balance using authorized service
     balance_operation = BalanceOperationRequest(
         amount=desired_amount,
@@ -417,11 +375,13 @@ def sell_asset_service(
 
     # Update or remove holding
     new_quantity = holding_quantity - quantity_to_sell
+    position_closed = False
 
     # Remove holding if position is effectively zero
     if new_quantity < Decimal("0.000001"):
         logger.info("Position closed completely, removing holding")
         db.delete(holding)
+        position_closed = True
     else:
         logger.info(f"Position reduced to {new_quantity} shares")
         holding.quantity = str(new_quantity)
@@ -430,8 +390,14 @@ def sell_asset_service(
 
     # Commit transaction
     db.commit()
-    db.refresh(simulation)
 
+    # 🔥 NEW: Clean up asset from database if no simulations own it anymore
+    if position_closed:
+        logger.info(f"🗑️  Checking if asset {request.ticker} should be removed from database...")
+        AssetService.remove_from_database_if_orphaned(db, request.ticker, simulation_id)
+        logger.info(f"✅ Asset cleanup check complete for {request.ticker}")
+
+    db.refresh(simulation)
     logger.info(f"Sale completed successfully for {request.ticker}")
 
     return SimulationRead.model_validate(simulation)

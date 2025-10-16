@@ -257,7 +257,7 @@ function SimulationList({ onOpenSimulation }) {
                                 required
                             />
                             <Form.Text className="text-muted">
-                                The date your simulation begins (can be in the past)
+                                The date your simulation begins (should be in the past)
                             </Form.Text>
                         </Form.Group>
 
