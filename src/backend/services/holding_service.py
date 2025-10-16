@@ -21,14 +21,14 @@ from src.backend.models.simulation import SimulationORM
 from src.backend.models.holding import HoldingORM
 from src.backend.services.asset_service import AssetService
 from src.backend.services.exceptions import SimulationNotFoundError
-
+from src.backend.services.exchange_service import ExchangeService
 
 def update_holdings_attributes(db: Session, simulation_id: int) -> List[HoldingORM]:
     """
     Recalculate all holding attributes for a simulation.
 
     Updates for each holding:
-    - current_price: Latest price at simulation's current_date
+    - current_price: Latest price at simulation's current_date (converted to simulation currency)
     - market_value: quantity * current_price
     - weight: (market_value / total_portfolio_value) * 100
 
@@ -37,16 +37,6 @@ def update_holdings_attributes(db: Session, simulation_id: int) -> List[HoldingO
     - Selling assets
     - Advancing simulation time
     - Manual price updates
-
-    Args:
-        db: Database session
-        simulation_id: Target simulation
-
-    Returns:
-        List of updated holdings
-
-    Raises:
-        SimulationNotFoundError: If simulation doesn't exist
     """
     # Get simulation
     sim = db.query(SimulationORM).filter(
@@ -56,48 +46,59 @@ def update_holdings_attributes(db: Session, simulation_id: int) -> List[HoldingO
     if not sim:
         raise SimulationNotFoundError(f"Simulation {simulation_id} not found")
 
-    # Get all holdings
+    sim_currency = sim.base_currency
+
+    # Get holdings
     holdings = db.query(HoldingORM).filter(
         HoldingORM.simulation_id == simulation_id
     ).all()
 
     if not holdings:
-        return []  # No holdings to update
+        return []
 
-    # Update each holding's price and market value
     for holding in holdings:
-        # Get current asset price
         asset = AssetService.search_asset(db, holding.ticker, simulation_id)
-        current_price = AssetService.get_price_at_date(asset, sim.current_date)
+        current_price_original = AssetService.get_price_at_date(asset, sim.current_date)
+        current_price_original = Decimal(str(current_price_original))
 
-        # Update price
-        holding.current_price = str(current_price)
+        asset_currency = getattr(holding, "base_currency", sim_currency)
 
-        # Calculate market value
-        quantity = Decimal(holding.quantity)
-        market_value = (quantity * current_price).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+        # 🔁 Conversão de moeda se necessário
+        if asset_currency != sim_currency:
+            rate_response = ExchangeService.get_exchange_rate(
+                db=db,
+                from_currency=asset_currency,
+                to_currency=sim_currency,
+                target_date=sim.current_date
+            )
+            exchange_rate = Decimal(str(rate_response.rate))
+            current_price_converted = (current_price_original * exchange_rate).quantize(
+                Decimal("0.0001"), rounding=ROUND_DOWN
+            )
+        else:
+            current_price_converted = current_price_original
+
+        holding.current_price = str(current_price_converted)
+
+        quantity = Decimal(str(holding.quantity))
+        market_value = (quantity * current_price_converted).quantize(
+            Decimal("0.01"), rounding=ROUND_DOWN
+        )
         holding.market_value = str(market_value)
 
-    # Calculate total portfolio value (sum of all market values)
-    total_portfolio_value = sum(
-        Decimal(h.market_value) for h in holdings
-    )
+    total_portfolio_value = sum(Decimal(h.market_value) for h in holdings)
 
-    # Update weights
     if total_portfolio_value > 0:
         for holding in holdings:
-            weight_percentage = (
-                    (Decimal(holding.market_value) / total_portfolio_value) * Decimal('100')
-            ).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
-            holding.weight = str(weight_percentage)
+            weight = (
+                (Decimal(holding.market_value) / total_portfolio_value) * Decimal("100")
+            ).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+            holding.weight = str(weight)
     else:
-        # No value - set all weights to 0
         for holding in holdings:
             holding.weight = "0.00"
 
     db.commit()
-
-    # Refresh all holdings
     for holding in holdings:
         db.refresh(holding)
 
