@@ -28,6 +28,7 @@ from src.backend.services.snapshot_service import create_monthly_snapshot
 from src.backend.services.balance_service import handle_balance_service
 from src.backend.services.holding_service import update_holdings_attributes
 from src.backend.services.asset_service import AssetService
+from src.backend.services.exchange_service import ExchangeService
 from src.backend.services.exceptions import SimulationNotFoundError
 
 
@@ -52,19 +53,13 @@ def advance_month_service(db: Session, simulation_id: int) -> MonthAdvancementRe
 
     CORRECT Process:
     1. Record initial state (before any changes)
-    2. Advance current_date by 1 month
-    3. Get dividends from NEW month (the month we just entered)
-    4. Pay dividends to balance
-    5. Update all asset prices to NEW month
-    6. Recalculate holdings attributes (market_value, etc)
-    7. Create snapshot of the NEW month state
+    2. Create snapshot BEFORE any changes (for undo)
+    3. Advance current_date by 1 month
+    4. Get dividends from NEW month and convert to simulation currency
+    5. Pay dividends to balance
+    6. Update all asset prices to NEW month
+    7. Recalculate holdings attributes (market_value, etc)
     8. Generate advancement report
-
-    Example Flow:
-        - Current: 30/04/2022
-        - Advance to: 31/05/2022
-        - Pay dividends from: May 2022 (01/05/2022)
-        - Update prices to: May 2022 prices
 
     Args:
         db: Database session
@@ -122,8 +117,7 @@ def advance_month_service(db: Session, simulation_id: int) -> MonthAdvancementRe
     db.commit()
     db.refresh(sim)
 
-    # STEP 4: Process dividends from the NEW month (the month we just entered)
-    # Dividends are paid when you ENTER the new month
+    # STEP 4: Process dividends from the NEW month (with currency conversion)
     report.dividends_received = _process_dividends(db, sim, holdings, report)
 
     # STEP 5: Update all holdings to new month prices
@@ -133,12 +127,7 @@ def advance_month_service(db: Session, simulation_id: int) -> MonthAdvancementRe
     print(f"\n🔄 Recalculating holdings attributes...")
     update_holdings_attributes(db, simulation_id)
 
-    # STEP 6: Create snapshot of the NEW month state (AFTER all updates)
-    print(f"\n📸 Creating snapshot for {new_date}...")
-    create_monthly_snapshot(db, simulation_id)
-
     # STEP 7: Calculate final state for report
-    # Refresh holdings to get updated values
     holdings = db.query(HoldingORM).filter(
         HoldingORM.simulation_id == simulation_id
     ).all()
@@ -147,7 +136,6 @@ def advance_month_service(db: Session, simulation_id: int) -> MonthAdvancementRe
         Decimal(h.market_value) for h in holdings
     )
 
-    # Refresh simulation to get updated balance
     db.refresh(sim)
     report.new_balance = Decimal(sim.balance)
 
@@ -170,43 +158,21 @@ def _process_dividends(
 ) -> List[Dict]:
     """
     Calculate and pay dividends for all holdings in the NEW month.
-
-    IMPORTANT: This is called AFTER advancing the date.
-    When you advance from April to May, you get May's dividends.
-    The simulation date represents the END of that month.
-
-    Example:
-        - Sim date: 30/04/2022 → Advance → 31/05/2022
-        - Pay dividends from: 01/05/2022 (the NEW month)
-
-    Args:
-        db: Database session
-        sim: Simulation object (with NEW date, already advanced)
-        holdings: List of current holdings
-        report: Report object to track total
-
-    Returns:
-        List of dividend payments
+    Automatically converts from asset currency to simulation currency.
     """
     dividends = []
     total_dividends = Decimal('0')
 
-    # Use NEW month (the month we just entered)
     current_month = sim.current_date.replace(day=1)
+    simulation_currency = sim.base_currency
 
     print(f"\n{'=' * 60}")
     print(f"💰 PROCESSING DIVIDENDS FOR MONTH: {current_month}")
+    print(f"💵 Simulation currency: {simulation_currency}")
     print(f"{'=' * 60}")
 
     for holding in holdings:
         print(f"\n📌 Checking {holding.ticker} (quantity: {holding.quantity})")
-        print(f"   🔍 Searching asset with ticker: '{holding.ticker}'")
-
-        # DEBUG: Check all assets in database
-        all_assets = db.query(AssetORM).all()
-        print(f"   📊 Total assets in DB: {len(all_assets)}")
-        if all_assets:
-            print(f"   📋 Available tickers: {[a.ticker for a in all_assets]}")
 
         # Get asset data
         asset_orm = db.query(AssetORM).filter(
@@ -215,21 +181,13 @@ def _process_dividends(
 
         if not asset_orm:
             print(f"   ⚠️  Asset not found in database")
-            print(f"   ❌ Query failed: AssetORM.ticker == '{holding.ticker}'")
+            continue
 
-            # Try alternative queries
-            print(f"   🔄 Trying alternative searches...")
-            asset_by_id = db.query(AssetORM).filter(
-                AssetORM.id == holding.asset_id
-            ).first() if hasattr(holding, 'asset_id') else None
+        # Get asset currency
+        asset_currency = asset_orm.base_currency
+        print(f"   💱 Asset currency: {asset_currency}")
 
-            if asset_by_id:
-                print(f"   ✅ Found by asset_id! Ticker: {asset_by_id.ticker}")
-                asset_orm = asset_by_id
-            else:
-                continue
-
-        # Find dividend for CURRENT month
+        # Find dividend for current month
         dividend_found = False
         for month_data in asset_orm.monthly_data:
             month_date = date.fromisoformat(month_data["date"])
@@ -239,22 +197,57 @@ def _process_dividends(
                 dividend_value = month_data.get("dividends", "0.0")
 
                 print(f"   📅 Found data for {month_date}")
-                print(f"   💵 Dividend value: {dividend_value}")
+                print(f"   💵 Dividend value: {dividend_value} {asset_currency}")
 
                 if dividend_value and dividend_value != "0.0" and float(dividend_value) > 0:
-                    # Calculate dividend payment
-                    dividend_per_share = Decimal(str(dividend_value))
+                    # Calculate dividend in original currency
+                    dividend_per_share_original = Decimal(str(dividend_value))
                     quantity = Decimal(str(holding.quantity))
-                    total_dividend = dividend_per_share * quantity
+                    total_dividend_original = dividend_per_share_original * quantity
 
-                    print(f"   ✅ PAYING DIVIDEND:")
-                    print(f"      • Per share: {dividend_per_share}")
+                    print(f"   💰 Dividend calculation (original currency):")
+                    print(f"      • Per share: {dividend_per_share_original} {asset_currency}")
                     print(f"      • Quantity: {quantity}")
-                    print(f"      • Total: {total_dividend}")
+                    print(f"      • Total: {total_dividend_original} {asset_currency}")
 
-                    # Pay dividend through balance service
+                    # Convert to simulation currency if needed
+                    if asset_currency != simulation_currency:
+                        print(f"   🔁 Converting {asset_currency} → {simulation_currency}")
+
+                        try:
+                            rate_response = ExchangeService.get_exchange_rate(
+                                db=db,
+                                from_currency=asset_currency,
+                                to_currency=simulation_currency,
+                                target_date=sim.current_date
+                            )
+                            exchange_rate = Decimal(str(rate_response.rate))
+
+                            dividend_per_share_converted = dividend_per_share_original * exchange_rate
+                            total_dividend_converted = total_dividend_original * exchange_rate
+
+                            print(f"      • Exchange rate: {exchange_rate}")
+                            print(
+                                f"      • Per share (converted): {dividend_per_share_converted} {simulation_currency}")
+                            print(f"      • Total (converted): {total_dividend_converted} {simulation_currency}")
+
+                        except Exception as e:
+                            print(f"   ❌ Currency conversion failed: {e}")
+                            print(f"   ⚠️  Skipping dividend payment for {holding.ticker}")
+                            continue
+                    else:
+                        # Same currency, no conversion needed
+                        dividend_per_share_converted = dividend_per_share_original
+                        total_dividend_converted = total_dividend_original
+                        exchange_rate = Decimal('1.0')
+                        print(f"   ✅ No conversion needed (same currency)")
+
+                    # Pay dividend in simulation currency
+                    print(f"   ✅ PAYING DIVIDEND:")
+                    print(f"      • Amount: {total_dividend_converted} {simulation_currency}")
+
                     dividend_request = BalanceOperationRequest(
-                        amount=total_dividend,
+                        amount=total_dividend_converted,
                         operation=Operation.ADD,
                         category="dividend",
                         ticker=holding.ticker,
@@ -262,17 +255,25 @@ def _process_dividends(
                     )
                     handle_balance_service(db, sim.id, dividend_request)
 
-                    dividends.append({
+                    # Record dividend with conversion info
+                    dividend_record = {
                         "ticker": holding.ticker,
-                        "dividend_per_share": str(dividend_per_share),
+                        "dividend_per_share_original": str(dividend_per_share_original),
+                        "dividend_per_share_converted": str(dividend_per_share_converted),
                         "quantity": str(quantity),
-                        "total": str(total_dividend),
-                        "date": current_month.isoformat()
-                    })
+                        "total_original": str(total_dividend_original),
+                        "total_converted": str(total_dividend_converted),
+                        "original_currency": asset_currency,
+                        "converted_currency": simulation_currency,
+                        "exchange_rate": str(exchange_rate),
+                        "date": current_month.isoformat(),
+                        "was_converted": asset_currency != simulation_currency
+                    }
 
-                    total_dividends += total_dividend
+                    dividends.append(dividend_record)
+                    total_dividends += total_dividend_converted
                 else:
-                    print(f"   ℹ️  No dividend for this month (value: {dividend_value})")
+                    print(f"   ℹ️  No dividend for this month")
                 break
 
         if not dividend_found:
@@ -280,8 +281,19 @@ def _process_dividends(
 
     print(f"\n{'=' * 60}")
     print(f"✅ DIVIDENDS SUMMARY")
-    print(f"💵 Total dividends paid: {total_dividends}")
+    print(f"💵 Total dividends paid: {total_dividends} {simulation_currency}")
     print(f"📝 Number of payments: {len(dividends)}")
+
+    if dividends:
+        print(f"\n📋 Breakdown:")
+        for div in dividends:
+            if div["was_converted"]:
+                print(f"   • {div['ticker']}: {div['total_original']} {div['original_currency']} "
+                      f"→ {div['total_converted']} {div['converted_currency']} "
+                      f"(rate: {div['exchange_rate']})")
+            else:
+                print(f"   • {div['ticker']}: {div['total_converted']} {div['converted_currency']}")
+
     print(f"{'=' * 60}\n")
 
     report.total_dividends = total_dividends
@@ -293,17 +305,7 @@ def _update_prices_for_new_month(
         sim: SimulationORM,
         holdings: List[HoldingORM]
 ) -> List[Dict]:
-    """
-    Update prices for all holdings to the new month.
-
-    Args:
-        db: Database session
-        sim: Simulation object (with UPDATED current_date)
-        holdings: List of holdings
-
-    Returns:
-        List of price changes
-    """
+    """Update prices for all holdings to the new month."""
     price_updates = []
 
     print(f"\n{'=' * 60}")
@@ -313,11 +315,9 @@ def _update_prices_for_new_month(
     for holding in holdings:
         old_price = Decimal(str(holding.current_price))
 
-        # Get asset and new price
         asset = AssetService.search_asset(db, holding.ticker, sim.id)
         new_price = AssetService.get_price_at_date(asset, sim.current_date)
 
-        # Calculate change
         price_change = new_price - old_price
         price_change_pct = (
             (price_change / old_price * Decimal('100'))
@@ -342,19 +342,7 @@ def _update_prices_for_new_month(
 
 
 def can_advance_month(db: Session, simulation_id: int) -> Dict:
-    """
-    Check if simulation can advance to next month.
-
-    Returns information about whether advancement is possible
-    and any warnings.
-
-    Args:
-        db: Database session
-        simulation_id: Target simulation
-
-    Returns:
-        Dictionary with 'can_advance' bool and 'reason' if blocked
-    """
+    """Check if simulation can advance to next month."""
     sim = db.query(SimulationORM).filter(
         SimulationORM.id == simulation_id
     ).first()
