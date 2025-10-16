@@ -634,10 +634,10 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                                     </Button>
                                                 </td>
                                                 <td className="text-end font-monospace">{quantity.toFixed(4)}</td>
-                                                <td className="text-end font-monospace">{formatCurrency(currentPrice, holding.base_currency)}</td>
-                                                <td className="text-end font-monospace fw-bold">{formatCurrency(marketValue, holding.base_currency)}</td>
+                                                <td className="text-end font-monospace">{formatCurrency(currentPrice, simulation.base_currency)}</td>
+                                                <td className="text-end font-monospace fw-bold">{formatCurrency(marketValue, simulation.base_currency)}</td>
                                                 <td className={`text-end font-monospace ${holdingGainLoss >= 0 ? 'gain' : 'loss'}`}>
-                                                    {formatCurrency(holdingGainLoss, holding.base_currency)}
+                                                    {formatCurrency(holdingGainLoss, simulation.base_currency)}
                                                     <br />
                                                     <small>({formatPercent(holdingGainLossPercent)})</small>
                                                 </td>
