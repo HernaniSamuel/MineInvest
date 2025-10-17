@@ -101,12 +101,7 @@ def advance_month_service(db: Session, simulation_id: int) -> MonthAdvancementRe
     print(f"📊 Current portfolio value: {report.previous_portfolio_value}")
     print(f"{'=' * 60}\n")
 
-    # STEP 2: Create snapshot BEFORE any changes (for undo capability)
-    print(f"📸 Creating snapshot BEFORE advancing (for undo)...")
-    create_monthly_snapshot(db, simulation_id)
-    print(f"✅ Snapshot created for {sim.current_date}\n")
-
-    # STEP 3: Advance date by 1 month
+    # STEP 2: Advance date by 1 month
     new_date = sim.current_date + relativedelta(months=1)
     old_date = sim.current_date
     sim.current_date = new_date
@@ -117,15 +112,20 @@ def advance_month_service(db: Session, simulation_id: int) -> MonthAdvancementRe
     db.commit()
     db.refresh(sim)
 
-    # STEP 4: Process dividends from the NEW month (with currency conversion)
+    # STEP 3: Process dividends from the NEW month (with currency conversion)
     report.dividends_received = _process_dividends(db, sim, holdings, report)
 
-    # STEP 5: Update all holdings to new month prices
+    # STEP 4: Update all holdings to new month prices
     report.price_updates = _update_prices_for_new_month(db, sim, holdings)
 
-    # STEP 6: Recalculate all holdings attributes (market_value based on new prices)
+    # STEP 5: Recalculate all holdings attributes (market_value based on new prices)
     print(f"\n🔄 Recalculating holdings attributes...")
     update_holdings_attributes(db, simulation_id)
+
+    # STEP 6: Create snapshot AFTER all processing (saves the new month state)
+    print(f"\n📸 Creating snapshot of new month state...")
+    create_monthly_snapshot(db, simulation_id)
+    print(f"✅ Snapshot created for {new_date}\n")
 
     # STEP 7: Calculate final state for report
     holdings = db.query(HoldingORM).filter(

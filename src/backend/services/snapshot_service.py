@@ -151,6 +151,13 @@ def restore_from_snapshot(db: Session, simulation_id: int) -> SimulationORM:
     print(f"💰 Snapshot balance: {snapshot.balance}")
     print(f"{'=' * 60}\n")
 
+    # Validate snapshot is not from the future
+    if snapshot.month_date > sim.current_date:
+        raise ValueError(
+            f"Snapshot is from the future ({snapshot.month_date}), "
+            f"but current date is {sim.current_date}. Cannot restore."
+        )
+
     # 1. Restore date to snapshot date
     sim.current_date = snapshot.month_date
     print(f"✅ Date restored to: {sim.current_date}")
