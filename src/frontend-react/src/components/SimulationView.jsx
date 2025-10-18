@@ -11,31 +11,21 @@ import {
 import { formatCurrency, formatDate, formatPercent } from '../utils/formatters';
 import BalanceModal from './BalanceModal';
 import StatCard from './StatCard';
-import { Line, Doughnut } from 'react-chartjs-2';
+import { Doughnut } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
     ArcElement,
     Title,
     Tooltip,
-    Legend,
-    Filler
+    Legend
 } from 'chart.js';
 import { showToast } from '../utils/toast';
 
 ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
     ArcElement,
     Title,
     Tooltip,
-    Legend,
-    Filler
+    Legend
 );
 
 function SimulationView({ simulationId, onBack, onGoToTrading }) {
@@ -205,7 +195,6 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
         setShowBalanceModal(true);
     };
 
-    // Format current date as MM/YYYY
     const formatCurrentDate = (dateString) => {
         const date = new Date(dateString);
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -234,107 +223,6 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
     const totalValue = balance + portfolioValue;
     const gainLoss = parseFloat(portfolio.summary.total_gain_loss);
     const gainLossPercent = parseFloat(portfolio.summary.gain_loss_percentage);
-
-    // Calculate percentage changes from initial value
-    const calculatePercentageData = () => {
-        if (!history?.months || history.months.length === 0) {
-            return [0];
-        }
-
-        const initialValue = parseFloat(history.months[0].total);
-
-        return history.months.map(m => {
-            const currentValue = parseFloat(m.total);
-            const percentChange = ((currentValue - initialValue) / initialValue) * 100;
-            return percentChange;
-        });
-    };
-
-    const percentageData = calculatePercentageData();
-    const absoluteData = history?.months?.map(m => parseFloat(m.total)) || [totalValue];
-
-    // Prepare chart data
-    const lineChartData = {
-        labels: history?.months?.map(m => formatDate(m.month_date)) || [formatDate(simulation.current_date)],
-        datasets: [
-            {
-                label: 'Portfolio Growth',
-                data: percentageData,
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,
-                yAxisID: 'y'
-            }
-        ]
-    };
-
-    const lineChartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-            mode: 'index',
-            intersect: false
-        },
-        plugins: {
-            legend: {
-                display: true,
-                position: 'bottom',
-                labels: { color: '#d1d5db' }
-            },
-            tooltip: {
-                backgroundColor: 'rgba(17, 24, 39, 0.95)',
-                titleColor: '#f3f4f6',
-                bodyColor: '#d1d5db',
-                borderColor: '#374151',
-                borderWidth: 1,
-                padding: 12,
-                displayColors: true,
-                callbacks: {
-                    title: (context) => {
-                        return context[0].label;
-                    },
-                    label: (context) => {
-                        const index = context.dataIndex;
-                        const percentChange = context.parsed.y;
-                        const absoluteValue = absoluteData[index] || 0;
-
-                        return [
-                            `Growth: ${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(2)}%`,
-                            `Value: ${formatCurrency(absoluteValue, simulation.base_currency)}`
-                        ];
-                    }
-                }
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                position: 'left',
-                grid: { color: '#374151' },
-                ticks: {
-                    color: '#9ca3af',
-                    callback: function(value) {
-                        return value.toFixed(1) + '%';
-                    }
-                },
-                title: {
-                    display: true,
-                    text: 'Growth (%)',
-                    color: '#9ca3af',
-                    font: {
-                        size: 12,
-                        weight: 'bold'
-                    }
-                }
-            },
-            x: {
-                grid: { display: false },
-                ticks: { color: '#9ca3af' }
-            }
-        }
-    };
 
     const doughnutChartData = portfolio.holdings.length > 0 ? {
         labels: portfolio.holdings.map(h => h.ticker),
@@ -529,35 +417,102 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                     </Col>
                 </Row>
 
-                {/* Charts */}
+                {/* Holdings Table and Asset Allocation Side by Side */}
                 <Row className="g-3 mb-4">
                     <Col lg={8}>
-                        <div className="chart-card">
+                        <div className="chart-card" style={{ height: '100%' }}>
                             <div className="chart-header d-flex justify-content-between align-items-center">
                                 <h5 className="mb-0">
-                                    <i className="bi bi-graph-up me-2"></i>
-                                    Portfolio Performance
+                                    <i className="bi bi-list-ul me-2"></i>
+                                    Current Holdings
                                 </h5>
-                                <Button size="sm" variant="outline-secondary" onClick={loadAllData}>
-                                    <i className="bi bi-arrow-clockwise"></i>
+                                <Button
+                                    size="sm"
+                                    variant="outline-primary"
+                                    onClick={handleRefreshHoldings}
+                                    disabled={loading}
+                                >
+                                    <i className="bi bi-arrow-clockwise me-1"></i> Refresh Prices
                                 </Button>
                             </div>
-                            <div className="chart-body" style={{ height: '300px' }}>
-                                <Line data={lineChartData} options={lineChartOptions} />
+                            <div className="table-responsive">
+                                <Table variant="dark" hover className="mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Ticker</th>
+                                            <th>Name</th>
+                                            <th className="text-end">Quantity</th>
+                                            <th className="text-end">Current Price</th>
+                                            <th className="text-end">Market Value</th>
+                                            <th className="text-end">Gain/Loss</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {portfolio.holdings.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="6" className="text-center text-muted py-4">
+                                                    <i className="bi bi-inbox display-4 mb-2 d-block"></i>
+                                                    No holdings yet. Click "Trade Assets" to start investing!
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            portfolio.holdings.map(holding => {
+                                                const quantity = parseFloat(holding.quantity);
+                                                const purchasePrice = parseFloat(holding.purchase_price);
+                                                const currentPrice = parseFloat(holding.current_price);
+                                                const marketValue = parseFloat(holding.market_value);
+                                                const invested = quantity * purchasePrice;
+                                                const holdingGainLoss = marketValue - invested;
+                                                const holdingGainLossPercent = (holdingGainLoss / invested) * 100;
+
+                                                return (
+                                                    <tr key={holding.ticker}>
+                                                        <td className="fw-bold">{holding.ticker}</td>
+                                                        <td>
+                                                            <Button
+                                                                variant="link"
+                                                                className="p-0 text-decoration-none"
+                                                                onClick={() => handleGoToTradingWithTicker(holding.ticker)}
+                                                                style={{
+                                                                    fontSize: 'inherit',
+                                                                    color: '#3b82f6',
+                                                                    textDecoration: 'none'
+                                                                }}
+                                                            >
+                                                                {holding.name}
+                                                                <i className="bi bi-box-arrow-up-right ms-1 small"></i>
+                                                            </Button>
+                                                        </td>
+                                                        <td className="text-end font-monospace">{quantity.toFixed(4)}</td>
+                                                        <td className="text-end font-monospace">{formatCurrency(currentPrice, simulation.base_currency)}</td>
+                                                        <td className="text-end font-monospace fw-bold">{formatCurrency(marketValue, simulation.base_currency)}</td>
+                                                        <td className={`text-end font-monospace ${holdingGainLoss >= 0 ? 'gain' : 'loss'}`}>
+                                                            {formatCurrency(holdingGainLoss, simulation.base_currency)}
+                                                            <br />
+                                                            <small>({formatPercent(holdingGainLossPercent)})</small>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </Table>
                             </div>
                         </div>
                     </Col>
                     <Col lg={4}>
-                        <div className="chart-card">
+                        <div className="chart-card" style={{ height: '100%' }}>
                             <div className="chart-header">
                                 <h5 className="mb-0">
                                     <i className="bi bi-pie-chart me-2"></i>
                                     Asset Allocation
                                 </h5>
                             </div>
-                            <div className="chart-body" style={{ height: '300px' }}>
+                            <div className="chart-body d-flex align-items-center justify-content-center" style={{ minHeight: '400px' }}>
                                 {doughnutChartData ? (
-                                    <Doughnut data={doughnutChartData} options={doughnutChartOptions} />
+                                    <div style={{ width: '100%', height: '350px' }}>
+                                        <Doughnut data={doughnutChartData} options={doughnutChartOptions} />
+                                    </div>
                                 ) : (
                                     <div className="text-center text-muted py-4">
                                         <i className="bi bi-inbox display-4 mb-3 d-block"></i>
@@ -568,87 +523,6 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                         </div>
                     </Col>
                 </Row>
-
-                {/* Holdings Table */}
-                <div className="chart-card mb-4">
-                    <div className="chart-header d-flex justify-content-between align-items-center">
-                        <h5 className="mb-0">
-                            <i className="bi bi-list-ul me-2"></i>
-                            Current Holdings
-                        </h5>
-                        <Button
-                            size="sm"
-                            variant="outline-primary"
-                            onClick={handleRefreshHoldings}
-                            disabled={loading}
-                        >
-                            <i className="bi bi-arrow-clockwise me-1"></i> Refresh Prices
-                        </Button>
-                    </div>
-                    <div className="table-responsive">
-                        <Table variant="dark" hover className="mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Ticker</th>
-                                    <th>Name</th>
-                                    <th className="text-end">Quantity</th>
-                                    <th className="text-end">Current Price</th>
-                                    <th className="text-end">Market Value</th>
-                                    <th className="text-end">Gain/Loss</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {portfolio.holdings.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="6" className="text-center text-muted py-4">
-                                            <i className="bi bi-inbox display-4 mb-2 d-block"></i>
-                                            No holdings yet. Click "Trade Assets" to start investing!
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    portfolio.holdings.map(holding => {
-                                        const quantity = parseFloat(holding.quantity);
-                                        const purchasePrice = parseFloat(holding.purchase_price);
-                                        const currentPrice = parseFloat(holding.current_price);
-                                        const marketValue = parseFloat(holding.market_value);
-                                        const invested = quantity * purchasePrice;
-                                        const holdingGainLoss = marketValue - invested;
-                                        const holdingGainLossPercent = (holdingGainLoss / invested) * 100;
-
-                                        return (
-                                            <tr key={holding.ticker}>
-                                                <td className="fw-bold">{holding.ticker}</td>
-                                                <td>
-                                                    <Button
-                                                        variant="link"
-                                                        className="p-0 text-decoration-none"
-                                                        onClick={() => handleGoToTradingWithTicker(holding.ticker)}
-                                                        style={{
-                                                            fontSize: 'inherit',
-                                                            color: '#3b82f6',
-                                                            textDecoration: 'none'
-                                                        }}
-                                                    >
-                                                        {holding.name}
-                                                        <i className="bi bi-box-arrow-up-right ms-1 small"></i>
-                                                    </Button>
-                                                </td>
-                                                <td className="text-end font-monospace">{quantity.toFixed(4)}</td>
-                                                <td className="text-end font-monospace">{formatCurrency(currentPrice, simulation.base_currency)}</td>
-                                                <td className="text-end font-monospace fw-bold">{formatCurrency(marketValue, simulation.base_currency)}</td>
-                                                <td className={`text-end font-monospace ${holdingGainLoss >= 0 ? 'gain' : 'loss'}`}>
-                                                    {formatCurrency(holdingGainLoss, simulation.base_currency)}
-                                                    <br />
-                                                    <small>({formatPercent(holdingGainLossPercent)})</small>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </Table>
-                    </div>
-                </div>
 
                 {/* Transaction History */}
                 <div className="chart-card">
