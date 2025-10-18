@@ -319,3 +319,22 @@ small {
 [style*="overflow"]::-webkit-scrollbar-thumb:hover {
   background: #4b5563;
 }
+
+/* Gain/Loss color styling com efeito */
+.stat-value.gain {
+  color: var(--color-success) !important;
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.stat-value.loss {
+  color: var(--color-danger) !important;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+.gain {
+  color: var(--color-success) !important;
+}
+
+.loss {
+  color: var(--color-danger) !important;
+}

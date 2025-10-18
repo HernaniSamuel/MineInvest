@@ -189,16 +189,14 @@ def restore_from_snapshot(db: Session, simulation_id: int) -> SimulationORM:
         db.add(holding)
     print(f"✅ Recreated {len(snapshot.holdings_snapshot)} holdings from snapshot")
 
-    # 5. Delete ALL history entries AFTER snapshot date (including the advanced month)
-    # This ensures dividends from the advanced month are removed
+    # 5. Delete ALL history entries AFTER snapshot date (INCLUDING the snapshot month)
     deleted_history = db.query(HistoryMonthORM).filter(
         HistoryMonthORM.simulation_id == simulation_id,
-        HistoryMonthORM.month_date > snapshot.month_date
+        HistoryMonthORM.month_date >= snapshot.month_date  # >= ao invés de >
     ).delete()
 
     if deleted_history > 0:
-        print(f"✅ Deleted {deleted_history} history entries from months after snapshot")
-
+        print(f"✅ Deleted {deleted_history} history entries from snapshot month onwards")
     db.commit()
     db.refresh(sim)
 

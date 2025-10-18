@@ -318,6 +318,39 @@ function SimulationList({ onOpenSimulation }) {
                     </Button>
                 </Modal.Footer>
             </Modal>
+            {/* Footer com créditos - versão estilosa */}
+<div className="text-center py-4 mt-5" style={{
+    borderTop: '1px solid var(--border-color)',
+}}>
+    <div className="d-flex justify-content-center align-items-center gap-2" style={{ opacity: 0.6 }}>
+        <small className="text-muted">
+            Built with <span style={{ color: '#ef4444' }}>♥</span> by
+        </small>
+        <a
+            href="https://hernanisamuel.github.io/meu_portfolio/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-decoration-none"
+            style={{
+                color: '#10b981',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+                e.target.style.color = '#34d399';
+                e.target.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+                e.target.style.color = '#10b981';
+                e.target.style.transform = 'translateY(0)';
+            }}
+        >
+            Hernani Samuel Diniz
+        </a>
+        <small className="text-muted">• 2025</small>
+    </div>
+</div>
         </div>
     );
 }

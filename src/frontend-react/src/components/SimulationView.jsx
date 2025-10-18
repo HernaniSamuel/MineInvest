@@ -316,15 +316,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                             </div>
                         </Col>
                         <Col xs="auto" className="d-flex gap-2">
-                            <Button
-                                variant="outline-info"
-                                onClick={handleCreateCheckpoint}
-                                disabled={loading}
-                                title="Save current state"
-                            >
-                                <i className="bi bi-save me-1"></i>
-                                Save Checkpoint
-                            </Button>
+
                             <Button
                                 variant="outline-warning"
                                 onClick={handleUndoMonth}
@@ -332,7 +324,7 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                                 title={canUndo ? `Restore to checkpoint: ${snapshotInfo?.month_date ? formatDate(snapshotInfo.month_date) : ''}` : 'No checkpoint available'}
                             >
                                 <i className="bi bi-arrow-counterclockwise me-1"></i>
-                                Restore
+                                Reset Month
                             </Button>
                             <Button
                                 variant="success"
@@ -405,16 +397,17 @@ function SimulationView({ simulationId, onBack, onGoToTrading }) {
                             meta="Cash + Portfolio"
                         />
                     </Col>
-                    <Col lg={3} md={6}>
-                        <StatCard
-                            icon={gainLoss >= 0 ? "arrow-up" : "arrow-down"}
-                            iconBg={gainLoss >= 0 ? "success" : "danger"}
-                            label="Total Gain/Loss"
-                            value={formatCurrency(gainLoss, simulation.base_currency)}
-                            meta={formatPercent(gainLossPercent)}
-                            valueClass={gainLoss >= 0 ? "gain" : "loss"}
-                        />
-                    </Col>
+                   <Col lg={3} md={6}>
+                    <StatCard
+                        icon={gainLoss >= 0 ? "arrow-up" : "arrow-down"}
+                        iconBg={gainLoss >= 0 ? "success" : "danger"}
+                        label="Total Gain/Loss"
+                        value={formatCurrency(gainLoss, simulation.base_currency)}
+                        meta={formatPercent(gainLossPercent)}
+                        valueClass={gainLoss >= 0 ? "gain" : "loss"}
+                        metaClass={gainLoss >= 0 ? "gain" : "loss"}  // 👈 Adiciona isso
+                    />
+                </Col>
                 </Row>
 
                 {/* Holdings Table and Asset Allocation Side by Side */}
