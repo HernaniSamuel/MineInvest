@@ -20,7 +20,7 @@ from typing import Dict
 import asyncio
 from datetime import datetime, timedelta
 
-router = APIRouter(prefix="/api", tags=["Assets"])
+router = APIRouter(tags=["Assets"])
 logger = logging.getLogger(__name__)
 
 # Simple in-memory cache

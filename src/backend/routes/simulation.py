@@ -46,7 +46,7 @@ from src.backend.services.snapshot_service import (
 router = APIRouter(prefix="/simulations", tags=["Simulations"])
 
 
-@router.post("/", response_model=SimulationRead, status_code=201)
+@router.post("/api", response_model=SimulationRead, status_code=201)
 def create_simulation(
     simulation: SimulationCreate,
     db: Session = Depends(get_db)

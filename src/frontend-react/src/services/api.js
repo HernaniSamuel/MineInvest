@@ -16,7 +16,9 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+// Use URL relativa em produção (quando servido pelo FastAPI)
+// Use URL absoluta em desenvolvimento (quando frontend roda em porta diferente)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -116,7 +118,7 @@ export const assetsAPI = {
      * @param {string} query - Termo de busca
      */
     search: (query) =>
-        api.get(`/api/search-assets`, {
+        api.get(`/search-assets`, {
             params: { q: query }
         })
 };
@@ -132,7 +134,7 @@ export const exchangeAPI = {
      * @param {string} date - Data para a taxa (formato: 'YYYY-MM-DD')
      */
     getRate: (fromCurrency, toCurrency, date) =>
-        api.get(`/api/exchange/rate`, {
+        api.get(`/exchange/rate`, {
             params: {
                 from_currency: fromCurrency,
                 to_currency: toCurrency,

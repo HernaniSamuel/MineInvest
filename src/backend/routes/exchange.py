@@ -21,7 +21,7 @@ from src.backend.models.session import get_db
 from src.backend.services.exchange_service import ExchangeService
 from src.backend.schemas.exchange import ExchangeRateResponse, ExchangeRateHistory
 
-router = APIRouter(prefix="/api/exchange", tags=["Exchange Rates"])
+router = APIRouter(prefix="/exchange", tags=["Exchange Rates"])
 
 
 @router.get("/rate", response_model=ExchangeRateResponse)
