@@ -16,7 +16,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Container, Row, Col, Button, Form, ListGroup, Spinner, Badge, Alert } from 'react-bootstrap';
-import axios from 'axios';
+import { holdingsAPI, assetsAPI } from '../services/api';  // ✅ MUDOU AQUI
 import { showToast } from '../utils/toast';
 import { formatCurrency } from '../utils/formatters';
 import PriceChart from './PriceChart.jsx';
@@ -70,6 +70,7 @@ function TradingScreen({ simulation, onBack, initialTicker = null }) {
             loadAssetDirectly(initialTicker);
         }
     }, [initialTicker]);
+
     // Update current holding when selected asset or holdings change
     useEffect(() => {
         if (selectedAsset && holdings.length > 0) {
@@ -84,9 +85,8 @@ function TradingScreen({ simulation, onBack, initialTicker = null }) {
 
     const fetchHoldings = async () => {
         try {
-            const response = await axios.get(
-                `http://127.0.0.1:8000/simulations/${currentSimulation.id}/holdings`
-            );
+            // ✅ USANDO holdingsAPI
+            const response = await holdingsAPI.list(currentSimulation.id);
             setHoldings(response.data);
             console.log('Holdings fetched:', response.data);
         } catch (error) {
@@ -102,14 +102,8 @@ function TradingScreen({ simulation, onBack, initialTicker = null }) {
         setSelectedAsset(null);
 
         try {
-            const response = await axios.get(
-                `http://127.0.0.1:8000/assets/${ticker}`,
-                {
-                    params: {
-                        simulation_id: currentSimulation.id
-                    }
-                }
-            );
+            // ✅ USANDO assetsAPI
+            const response = await assetsAPI.get(ticker, currentSimulation.id);
 
             console.log('Asset data from backend:', response.data);
 
@@ -169,9 +163,8 @@ function TradingScreen({ simulation, onBack, initialTicker = null }) {
         setSearching(true);
 
         try {
-            const response = await axios.get(
-                `http://127.0.0.1:8000/api/search-assets?q=${encodeURIComponent(query)}`
-            );
+            // ✅ USANDO assetsAPI
+            const response = await assetsAPI.search(query);
 
             const quotes = response.data.quotes || [];
             const sortedQuotes = quotes
@@ -207,14 +200,8 @@ function TradingScreen({ simulation, onBack, initialTicker = null }) {
         setSelectedAsset(null);
 
         try {
-            const response = await axios.get(
-                `http://127.0.0.1:8000/assets/${asset.symbol}`,
-                {
-                    params: {
-                        simulation_id: currentSimulation.id
-                    }
-                }
-            );
+            // ✅ USANDO assetsAPI
+            const response = await assetsAPI.get(asset.symbol, currentSimulation.id);
 
             console.log('Asset data from backend:', response.data);
 
@@ -272,10 +259,8 @@ function TradingScreen({ simulation, onBack, initialTicker = null }) {
 
     const reloadAssetData = async (ticker) => {
         try {
-            const response = await axios.get(
-                `http://127.0.0.1:8000/assets/${ticker}`,
-                { params: { simulation_id: currentSimulation.id } }
-            );
+            // ✅ USANDO assetsAPI
+            const response = await assetsAPI.get(ticker, currentSimulation.id);
 
             setSelectedAsset(prev => ({
                 ...prev,

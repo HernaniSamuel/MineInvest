@@ -68,4 +68,77 @@ export const snapshotAPI = {
     restore: (simulationId) => api.post(`/simulations/${simulationId}/restore`),
     get: (simulationId) => api.get(`/simulations/${simulationId}/snapshot`)
 };
+
+// ========================================
+// 🆕 NOVAS APIs ADICIONADAS
+// ========================================
+
+/**
+ * APIs relacionadas a assets/trading
+ */
+export const assetsAPI = {
+    /**
+     * Busca informações de um asset específico
+     * @param {string} ticker - Símbolo do asset (ex: 'AAPL', 'PETR4.SA')
+     * @param {number} simulationId - ID da simulação (opcional)
+     */
+    get: (ticker, simulationId = null) => {
+        const params = simulationId ? { simulation_id: simulationId } : {};
+        return api.get(`/assets/${ticker}`, { params });
+    },
+
+    /**
+     * Compra um asset
+     * @param {number} simulationId - ID da simulação
+     * @param {string} ticker - Símbolo do asset
+     * @param {number} desiredAmount - Quantidade desejada
+     */
+    purchase: (simulationId, ticker, desiredAmount) =>
+        api.post(`/assets/${simulationId}/purchase`, {
+            ticker,
+            desired_amount: desiredAmount
+        }),
+
+    /**
+     * Vende um asset
+     * @param {number} simulationId - ID da simulação
+     * @param {string} ticker - Símbolo do asset
+     * @param {number} desiredAmount - Quantidade desejada
+     */
+    sell: (simulationId, ticker, desiredAmount) =>
+        api.post(`/assets/${simulationId}/sell`, {
+            ticker,
+            desired_amount: desiredAmount
+        }),
+
+    /**
+     * Busca assets (search)
+     * @param {string} query - Termo de busca
+     */
+    search: (query) =>
+        api.get(`/api/search-assets`, {
+            params: { q: query }
+        })
+};
+
+/**
+ * APIs relacionadas a conversão de moeda
+ */
+export const exchangeAPI = {
+    /**
+     * Obtém a taxa de conversão entre moedas
+     * @param {string} fromCurrency - Moeda de origem (ex: 'USD')
+     * @param {string} toCurrency - Moeda de destino (ex: 'BRL')
+     * @param {string} date - Data para a taxa (formato: 'YYYY-MM-DD')
+     */
+    getRate: (fromCurrency, toCurrency, date) =>
+        api.get(`/api/exchange/rate`, {
+            params: {
+                from_currency: fromCurrency,
+                to_currency: toCurrency,
+                date: date
+            }
+        })
+};
+
 export default api;

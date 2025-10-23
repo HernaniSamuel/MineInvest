@@ -16,7 +16,7 @@
 
 import { useState, useEffect } from 'react';
 import { Modal, Button, Form, InputGroup, Alert, Spinner } from 'react-bootstrap';
-import axios from 'axios';
+import { exchangeAPI, assetsAPI } from '../services/api';  // ✅ MUDOU AQUI
 import { showToast } from '../utils/toast';
 import { formatCurrency } from '../utils/formatters';
 
@@ -55,15 +55,11 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess, curr
         const fetchConversion = async () => {
             setLoadingConversion(true);
             try {
-                const response = await axios.get(
-                    `http://127.0.0.1:8000/api/exchange/rate`,
-                    {
-                        params: {
-                            from_currency: assetCurrency,
-                            to_currency: simulationCurrency,
-                            date: simulation.current_date
-                        }
-                    }
+                // ✅ USANDO exchangeAPI
+                const response = await exchangeAPI.getRate(
+                    assetCurrency,
+                    simulationCurrency,
+                    simulation.current_date
                 );
 
                 const rate = response.data.rate;
@@ -115,19 +111,15 @@ function TradingModal({ show, onHide, simulation, asset, action, onSuccess, curr
 
         setLoading(true);
 
-        const endpoint = isBuying ? 'purchase' : 'sell';
         const toastId = showToast.loading(
             `${isBuying ? 'Buying' : 'Selling'} ${asset.symbol}...`
         );
 
         try {
-            const response = await axios.post(
-                `http://127.0.0.1:8000/assets/${simulation.id}/${endpoint}`,
-                {
-                    ticker: asset.symbol,
-                    desired_amount: amountToSend
-                }
-            );
+            // ✅ USANDO assetsAPI
+            const response = isBuying
+                ? await assetsAPI.purchase(simulation.id, asset.symbol, amountToSend)
+                : await assetsAPI.sell(simulation.id, asset.symbol, amountToSend);
 
             showToast.update(
                 toastId,
