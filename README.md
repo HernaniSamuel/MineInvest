@@ -10,6 +10,28 @@
 
 ---
 
+## 📥 Download
+
+<div align="center">
+
+### **⬇️ [DOWNLOAD MINEINVEST v1.0.0 FOR WINDOWS](https://github.com/HernaniSamuel/MineInvest/releases/latest/download/mineinvest.exe)**
+
+*Windows 10+ • ~100MB • No installation required • Just download and run!*
+
+[![Download](https://img.shields.io/github/downloads/HernaniSamuel/MineInvest/total?style=for-the-badge&logo=github&label=Downloads)](https://github.com/HernaniSamuel/MineInvest/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/HernaniSamuel/MineInvest?style=for-the-badge&logo=github)](https://github.com/HernaniSamuel/MineInvest/releases/latest)
+
+**Quick Start:**
+1. Download the `.exe` file above
+2. Create a folder for it (e.g., `C:\MineInvest\`)
+3. Run the executable - browser opens automatically!
+
+[📖 View All Releases](https://github.com/HernaniSamuel/MineInvest/releases) • [💻 Run from Source Code](#-installation-from-source)
+
+</div>
+
+---
+
 ## 📸 Screenshots
 
 ### Dashboard - Simulations List
@@ -114,7 +136,9 @@
 
 ---
 
-## 📥 Installation
+## 💻 Installation from Source
+
+**Prefer the executable?** [Download it here](#-download) - no setup required!
 
 ### Prerequisites
 
@@ -175,7 +199,7 @@ The SQLite database will be created automatically on first run. No manual setup 
 
 ---
 
-## 🚀 Running the Application
+## 🚀 Running from Source
 
 You need to run **both** backend and frontend servers simultaneously.
 
@@ -387,7 +411,7 @@ Use ticker directly:
 
 ---
 
-## 🐛 Troubleshooting
+## 🛠 Troubleshooting
 
 ### Backend won't start
 
@@ -443,7 +467,7 @@ Future features being considered:
 - [ ] **Portfolio Performance Charts** - Visual growth over time
 - [ ] **Share Simulations** - Export/import simulation files (.minvest)
 - [ ] **Benchmark Comparison** - Compare with IBOV, S&P500
-- [ ] **Executable Software** - Just install MineInvest.exe and use it
+- [x] **Executable Software** - ~~Just install~~ Download MineInvest.exe and use it ✅
 
 **Got ideas?** [Open an issue](../../issues) or contribute!
 
@@ -494,6 +518,6 @@ If you find MineInvest useful, please consider:
 
 *Don't bet, get set.*
 
-[🚀 Get Started](#-installation) • [📖 Documentation](#-quick-start-guide) • [🐛 Report Bug](../../issues) • [✨ Request Feature](../../issues)
+[📥 Download](#-download) • [📖 Documentation](#-user-guide) • [🐛 Report Bug](../../issues) • [✨ Request Feature](../../issues)
 
 </div>
