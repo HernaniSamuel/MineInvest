@@ -105,13 +105,13 @@ def restore_from_snapshot(db: Session, simulation_id: int) -> SimulationORM:
     2. Restore balance to snapshot value
     3. Delete all current holdings
     4. Recreate holdings from snapshot
-    5. Delete ALL history for the month AFTER snapshot (including dividends)
+    5. Delete non-dividend operations from history after snapshot
 
     The snapshot represents the state BEFORE advancing the month,
     so restoring it will undo all operations from the advancement.
 
     WARNING: This cannot be undone! All operations after the snapshot
-    will be lost, including dividends received.
+    will be lost, EXCEPT dividend records which are preserved.
 
     Args:
         db: Database session
@@ -189,14 +189,39 @@ def restore_from_snapshot(db: Session, simulation_id: int) -> SimulationORM:
         db.add(holding)
     print(f"✅ Recreated {len(snapshot.holdings_snapshot)} holdings from snapshot")
 
-    # 5. Delete ALL history entries AFTER snapshot date (INCLUDING the snapshot month)
-    deleted_history = db.query(HistoryMonthORM).filter(
+    # 5. Clean history entries from snapshot date onwards, preserving dividends
+    history_entries = db.query(HistoryMonthORM).filter(
         HistoryMonthORM.simulation_id == simulation_id,
-        HistoryMonthORM.month_date >= snapshot.month_date  # >= ao invés de >
-    ).delete()
+        HistoryMonthORM.month_date >= snapshot.month_date
+    ).all()
 
-    if deleted_history > 0:
-        print(f"✅ Deleted {deleted_history} history entries from snapshot month onwards")
+    deleted_count = 0
+    preserved_dividends = 0
+
+    for entry in history_entries:
+        # Filter operations to keep only dividends
+        dividend_operations = [
+            op for op in entry.operations
+            if op.get('type') == 'dividend'
+        ]
+
+        if dividend_operations:
+            # Keep entry but only with dividend operations
+            entry.operations = dividend_operations
+            # Recalculate total based on dividends only
+            entry.total = str(sum(Decimal(str(op.get('amount', 0))) for op in dividend_operations))
+            preserved_dividends += len(dividend_operations)
+            print(f"💎 Preserved {len(dividend_operations)} dividend(s) from {entry.month_date}")
+        else:
+            # No dividends, safe to delete entire entry
+            db.delete(entry)
+            deleted_count += 1
+
+    if deleted_count > 0:
+        print(f"✅ Deleted {deleted_count} history entries with no dividends")
+    if preserved_dividends > 0:
+        print(f"💰 Preserved {preserved_dividends} dividend operation(s) in history")
+
     db.commit()
     db.refresh(sim)
 
